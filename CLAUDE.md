@@ -24,34 +24,28 @@ Vite · React 18 · TypeScript strict · Canvas 2D · @tonejs/midi · WebCodecs 
 
 ## Current state
 - Milestone: 4 — Audio playback + live sync (see SPEC.md §6) — DONE
-- Done: `src/audio/clock.ts` (`PlaybackClock`, injectable clock, never Date.now/
-  performance.now); `src/audio/instrument.ts` (wraps `smplr`'s `Soundfont2` +
-  `soundfont2`'s raw-SF2 parser behind our own `Instrument` interface, mirroring
-  `CanvasLike2D`'s structural-interface pattern); `src/audio/scheduler.ts` (schedules
-  visible-track notes from `Score` directly — no second MIDI parse, so audio can't
-  drift from visuals); Play/Pause/seek wired into `App.tsx`, driving `timeSec` via
-  rAF while playing. SoundFont asset `public/soundfonts/ChaosBank.sf2` (~11.5MB,
-  CC0 1.0, rKhive) chosen over the smaller `TimGM6mb.sf2` (GPLv2) specifically to
-  avoid copyleft entanglement if this repo ever goes public — deliberate call, see
-  SPEC §3's new "swappable soundfont" Out-later item. Fixture `fixtures/fur_elise.mid`
-  added (Beethoven WoO 59, Mutopia, public domain, ~3min) for the SPEC §8 drift check.
-  Offline-render smoke-tested live via `smplr`'s `renderOffline` — de-risks M6.
-- Known simplifications: fixed preview canvas size, no devicePixelRatio scaling;
-  `VizConfig.colors` (SPEC §4) omitted — superseded by `Track.color`; no config UI
-  yet (M5); one shared instrument sound for all tracks (no per-track GM program).
-- Pitch bug RESOLVED (2026-07-14; earlier "corrupted soundfonts" diagnosis was
-  wrong): SF2s legitimately leave the sample header's originalPitch unset
-  (255 → spec mandates the 60 fallback `soundfont2` applies) and carry the real
-  root key in zone generator 58 (OverridingRootKey). smplr's SF2→preset
-  conversion ignores gen 58, so every multi-sampled zone played as if recorded
-  at middle C. Fixed by `applyOverridingRootKeys` (src/audio/instrument.ts);
-  verified spectrally (A4 renders 440Hz, was 880Hz). Never parse sample names.
-- Traps for next milestones: **M6** — scheduler.ts note-offs are setTimeout-
-  based and will never fire inside a faster-than-realtime OfflineAudioContext
-  render; the exporter must pass explicit note durations instead (safe there:
-  no pause/seek mid-render). **M5** — `SCROLL_OFF_BUFFER_SEC` (App.tsx) bakes
-  `DEFAULT_VIZ_CONFIG.pxPerSec` in at module scope; recompute from live config
-  once pxPerSec becomes editable, or the scroll-out tail breaks.
+- Done: `src/audio/{clock,instrument,scheduler}.ts` + Play/Pause/seek in `App.tsx`
+  (rAF-driven `timeSec`, never Date.now/performance.now). Audio schedules notes
+  straight from `Score` (no second MIDI parse). SoundFont `public/soundfonts/
+  ChaosBank.sf2` (CC0 1.0, rKhive) over GPLv2 `TimGM6mb.sf2` — deliberate,
+  see SPEC §3 "swappable soundfont". Fixture `fixtures/fur_elise.mid` added
+  for the §8 drift check. Offline-render smoke-tested — de-risks M6.
+- Pitch bug RESOLVED (2026-07-14): SF2 sample headers legitimately leave
+  originalPitch unset (255 → spec's 60 fallback); real root key is in zone
+  generator 58 (`OverridingRootKey`), which smplr's SF2→preset conversion
+  ignored, so multi-sampled zones played as if recorded at middle C. Fixed by
+  `applyOverridingRootKeys` (instrument.ts); verified spectrally. Don't
+  resurrect the "parse pitch from sample name" idea — dead end, checked.
+- Known simplifications / traps: no devicePixelRatio scaling; no config UI
+  (M5) — `SCROLL_OFF_BUFFER_SEC` (App.tsx) bakes in `pxPerSec`, must recompute
+  once editable; one shared instrument for all tracks — smplr also drops
+  velRange/envelope/tuning generators (only gen 58 patched), so per-track GM
+  instruments may hit layered patches; the `/piano/i` instrument-name
+  heuristic is file-specific (GeneralUser.sf2 has no "piano" name at all —
+  smplr reads low-level instrument names, not presets); scheduler.ts's
+  upfront full-piece scheduling is untested at SPEC §5's dense-orchestral
+  scale; M6's exporter needs explicit note durations — scheduler.ts's
+  setTimeout note-offs never fire in a faster-than-realtime offline render.
 - Next: Milestone 5 — Config UI + external audio
 <!-- Update this section at the end of every session; it replaces chat history. -->
 
