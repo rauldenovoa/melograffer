@@ -39,14 +39,19 @@ Vite · React 18 · TypeScript strict · Canvas 2D · @tonejs/midi · WebCodecs 
 - Known simplifications: fixed preview canvas size, no devicePixelRatio scaling;
   `VizConfig.colors` (SPEC §4) omitted — superseded by `Track.color`; no config UI
   yet (M5); one shared instrument sound for all tracks (no per-track GM program).
-- **Known bug, shipped anyway (user's call, 2026-07-14):** multi-sampled piano
-  zones play wrong notes/octaves. Root cause confirmed in `soundfont2` npm lib:
-  it clamps any raw `originalPitch` byte outside 0-127 to 60, and every piano
-  zone in ChaosBank.sf2 — and in every other community SF2 tested (TimGM6mb,
-  Masterpiece, Jnsgm2, Unison) — reads as invalid, so all zones think they were
-  recorded at middle C. Fix path (not built): each affected sample's
-  `header.name` spells out its real pitch ("Piano C#8") — parse that instead of
-  trusting `originalPitch`. Revisit before relying on pitch correctness.
+- Pitch bug RESOLVED (2026-07-14; earlier "corrupted soundfonts" diagnosis was
+  wrong): SF2s legitimately leave the sample header's originalPitch unset
+  (255 → spec mandates the 60 fallback `soundfont2` applies) and carry the real
+  root key in zone generator 58 (OverridingRootKey). smplr's SF2→preset
+  conversion ignores gen 58, so every multi-sampled zone played as if recorded
+  at middle C. Fixed by `applyOverridingRootKeys` (src/audio/instrument.ts);
+  verified spectrally (A4 renders 440Hz, was 880Hz). Never parse sample names.
+- Traps for next milestones: **M6** — scheduler.ts note-offs are setTimeout-
+  based and will never fire inside a faster-than-realtime OfflineAudioContext
+  render; the exporter must pass explicit note durations instead (safe there:
+  no pause/seek mid-render). **M5** — `SCROLL_OFF_BUFFER_SEC` (App.tsx) bakes
+  `DEFAULT_VIZ_CONFIG.pxPerSec` in at module scope; recompute from live config
+  once pxPerSec becomes editable, or the scroll-out tail breaks.
 - Next: Milestone 5 — Config UI + external audio
 <!-- Update this section at the end of every session; it replaces chat history. -->
 

@@ -30,3 +30,11 @@ Direct inspiration: Stephen Malinowski's **Music Animation Machine (MAM)**, spec
 This project is an independent reimplementation of that documented visual concept (pitch =
 vertical position, duration = size, scrolling colored lines per voice) using a different,
 modern web stack — no MAM code, assets, or binaries are used or referenced at runtime.
+
+Bundled assets:
+
+- `public/soundfonts/ChaosBank.sf2` — "Chaos Bank v1.9" GM SoundFont (rKhive), CC0 1.0.
+- `fixtures/*.mid` — public-domain MIDI transcriptions from the
+  [Mutopia Project](https://www.mutopiaproject.org/): Bach Invention No. 1 (BWV 772),
+  Bach Sinfonia No. 1 (BWV 787), "Menuet in G" (BWV Anh. 114, attributed to Christian
+  Petzold, formerly J.S. Bach), and Beethoven's Für Elise (WoO 59).
