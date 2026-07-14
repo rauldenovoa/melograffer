@@ -26,9 +26,15 @@ export async function loadInstrument(ctx: BaseAudioContext): Promise<Instrument>
     await sampler.loadInstrument(firstInstrumentName)
   }
 
+  let nextStopId = 0
+
   return {
     start(opts) {
-      return sampler.start(opts)
+      // smplr's stopId defaults to the note number, so two overlapping notes
+      // of the same pitch (common across tracks) would otherwise share one —
+      // stopping either voice would stop both. A unique id per call keeps
+      // each returned stop function scoped to only the voice it started.
+      return sampler.start({ ...opts, stopId: nextStopId++ })
     },
   }
 }
