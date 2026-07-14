@@ -16,3 +16,12 @@ export interface Track {
 export interface Score {
   tracks: Track[]
 }
+
+export interface VizConfig {
+  bg: string
+  pxPerSec: number
+  dotScale: number
+  radiusMode: 'sqrt' | 'linear'
+  /** Fraction of canvas width (0..1) where the fixed playhead sits. */
+  playheadX: number
+}

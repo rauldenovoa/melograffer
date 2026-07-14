@@ -25,4 +25,23 @@ describe('App', () => {
       expect(screen.getByText(/staffB:/)).toBeInTheDocument()
     })
   })
+
+  it('shows a canvas and a scrub slider once a MIDI file is loaded', async () => {
+    render(<App />)
+    const buffer = readFileSync(resolve(__dirname, '../fixtures/multitrack.mid'))
+    const file = new File([buffer], 'multitrack.mid')
+
+    const fileInput = document.querySelector('input[type="file"]')!
+    fireEvent.change(fileInput, { target: { files: [file] } })
+
+    await waitFor(() => {
+      expect(document.querySelector('canvas')).toBeInTheDocument()
+    })
+
+    const slider = screen.getByRole('slider', { name: /playback position/i })
+    expect(Number(slider.getAttribute('max'))).toBeGreaterThan(0)
+
+    fireEvent.change(slider, { target: { value: '1' } })
+    expect((slider as HTMLInputElement).value).toBe('1')
+  })
 })

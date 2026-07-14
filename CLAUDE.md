@@ -23,13 +23,17 @@ Vite · React 18 · TypeScript strict · Canvas 2D · @tonejs/midi · WebCodecs 
 - Conventional commits; commit per milestone task.
 
 ## Current state
-- Milestone: 2 — MIDI ingest + data model (see SPEC.md §6) — DONE
-- Done: `src/types.ts` (Score/Track/Note); `src/midi/parseMidi.ts` via `@tonejs/midi`;
-  minimal file-drop UI in `App.tsx` rendering track name + note count; fixtures
-  `fixtures/{bach_invention,multitrack}.mid` (Mutopia Project, public domain —
-  `multitrack.mid` is "Menuet in G" BWV Anh. 114, musicologically Petzold not Bach,
-  credit accordingly); vitest unit tests pinned to real parsed values.
-- Next: Milestone 3 — Canvas renderer (`drawFrame` pure fn, time slider scrub)
+- Milestone: 3 — Canvas renderer (see SPEC.md §6) — DONE
+- Done: `src/types.ts` (+`VizConfig`); `src/render/mapping.ts` (pure pitch/duration/x/
+  window math, pitch range auto-fits per score); `src/render/drawFrame.ts` (pure
+  `drawFrame`, `CanvasLike2D` structural interface, halo-then-dot draw order);
+  `src/render/defaultConfig.ts`; canvas + time-slider scrub UI in `App.tsx`; fixture
+  `fixtures/bach_sinfonia.mid` added (Mutopia Project, public domain — Bach Sinfonia
+  No. 1, BWV 787, three-voice, for density/culling tests).
+- Known simplifications (not bugs, revisit if they become issues): fixed preview
+  canvas size, no devicePixelRatio scaling; `VizConfig.colors` (SPEC §4) omitted —
+  superseded by `Track.color`; no config UI yet (M5).
+- Next: Milestone 4 — Audio playback + live sync
 <!-- Update this section at the end of every session; it replaces chat history. -->
 
 ## Rules
