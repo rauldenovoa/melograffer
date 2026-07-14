@@ -23,13 +23,13 @@ Vite · React 18 · TypeScript strict · Canvas 2D · @tonejs/midi · WebCodecs 
 - Conventional commits; commit per milestone task.
 
 ## Current state
-- Milestone: 1 — Scaffold (see SPEC.md §6) — DONE
-- Done: Vite+React+TS scaffold (strict TS, eslint, vitest smoke test); module dirs
-  `src/{midi,render,audio,export}` created empty. Repo: github.com/rauldenovoa/melograffer
-  (public). Deployed: https://melograffer.vercel.app (Vercel CLI, `vercel.json` pins
-  framework/build/output since zero-config detection missed Vite).
-- Next: Milestone 2 — MIDI ingest + data model (`src/types.ts`, `@tonejs/midi` parsing,
-  fixtures in `fixtures/`)
+- Milestone: 2 — MIDI ingest + data model (see SPEC.md §6) — DONE
+- Done: `src/types.ts` (Score/Track/Note); `src/midi/parseMidi.ts` via `@tonejs/midi`;
+  minimal file-drop UI in `App.tsx` rendering track name + note count; fixtures
+  `fixtures/{bach_invention,multitrack}.mid` (Mutopia Project, public domain —
+  `multitrack.mid` is "Menuet in G" BWV Anh. 114, musicologically Petzold not Bach,
+  credit accordingly); vitest unit tests pinned to real parsed values.
+- Next: Milestone 3 — Canvas renderer (`drawFrame` pure fn, time slider scrub)
 <!-- Update this section at the end of every session; it replaces chat history. -->
 
 ## Rules
