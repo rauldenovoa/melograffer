@@ -39,6 +39,14 @@ Vite · React 18 · TypeScript strict · Canvas 2D · @tonejs/midi · WebCodecs 
 - Known simplifications: fixed preview canvas size, no devicePixelRatio scaling;
   `VizConfig.colors` (SPEC §4) omitted — superseded by `Track.color`; no config UI
   yet (M5); one shared instrument sound for all tracks (no per-track GM program).
+- **Known bug, shipped anyway (user's call, 2026-07-14):** multi-sampled piano
+  zones play wrong notes/octaves. Root cause confirmed in `soundfont2` npm lib:
+  it clamps any raw `originalPitch` byte outside 0-127 to 60, and every piano
+  zone in ChaosBank.sf2 — and in every other community SF2 tested (TimGM6mb,
+  Masterpiece, Jnsgm2, Unison) — reads as invalid, so all zones think they were
+  recorded at middle C. Fix path (not built): each affected sample's
+  `header.name` spells out its real pitch ("Piano C#8") — parse that instead of
+  trusting `originalPitch`. Revisit before relying on pitch correctness.
 - Next: Milestone 5 — Config UI + external audio
 <!-- Update this section at the end of every session; it replaces chat history. -->
 
