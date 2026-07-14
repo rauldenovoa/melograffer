@@ -9,13 +9,21 @@ const MIDI_VELOCITY_SCALE = 127
  * (audioContext.currentTime at the moment playback starts). Notes already
  * in progress at `fromSec` are re-triggered immediately with a shortened
  * duration rather than resumed mid-sample.
+ *
+ * Each note's natural end is driven by our own setTimeout rather than
+ * smplr's `duration` option (see instrument.ts) — that keeps the voice's
+ * one-shot stop() available for early cancellation (pause/seek/new file),
+ * whichever comes first. Returns the per-note cancel functions so the
+ * caller can reliably stop everything early.
  */
 export function scheduleScore(
   instrument: Instrument,
   score: Score,
   fromSec: number,
   atCtxTime: number,
-): void {
+): Array<() => void> {
+  const cancelFns: Array<() => void> = []
+
   for (const track of score.tracks) {
     if (!track.visible) continue
 
@@ -24,16 +32,25 @@ export function scheduleScore(
       if (endSec <= fromSec) continue
 
       const soundingFromSec = Math.max(note.startSec, fromSec)
-      instrument.start({
+      const stopVoice = instrument.start({
         note: note.midiNote,
         velocity: Math.round(note.velocity * MIDI_VELOCITY_SCALE),
         time: atCtxTime + (soundingFromSec - fromSec),
-        duration: endSec - soundingFromSec,
+      })
+
+      const naturalEndDelayMs = (endSec - fromSec) * 1000
+      const timeoutId = setTimeout(stopVoice, naturalEndDelayMs)
+
+      cancelFns.push(() => {
+        clearTimeout(timeoutId)
+        stopVoice()
       })
     }
   }
+
+  return cancelFns
 }
 
-export function stopAll(instrument: Instrument): void {
-  instrument.stop()
+export function stopAll(cancelFns: Array<() => void>): void {
+  for (const cancel of cancelFns) cancel()
 }

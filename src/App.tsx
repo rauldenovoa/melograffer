@@ -12,6 +12,9 @@ import type { Score } from './types'
 const CANVAS_WIDTH = 960
 const CANVAS_HEIGHT = 360
 
+/** Extra time after the last note so its dot scrolls fully off-screen instead of freezing mid-flight. */
+const SCROLL_OFF_BUFFER_SEC = CANVAS_WIDTH / DEFAULT_VIZ_CONFIG.pxPerSec
+
 function App() {
   const [score, setScore] = useState<Score | null>(null)
   const [timeSec, setTimeSec] = useState(0)
@@ -22,16 +25,23 @@ function App() {
   const audioCtxRef = useRef<AudioContext | null>(null)
   const clockRef = useRef<PlaybackClock | null>(null)
   const instrumentRef = useRef<Instrument | null>(null)
+  const activeStopFnsRef = useRef<Array<() => void>>([])
   const rafRef = useRef<number | null>(null)
 
   const duration = useMemo(() => (score ? scoreDurationSec(score) : 0), [score])
+  const playbackEndSec = duration + SCROLL_OFF_BUFFER_SEC
+
+  function stopSound() {
+    stopAll(activeStopFnsRef.current)
+    activeStopFnsRef.current = []
+  }
 
   function stopPlayback() {
     if (rafRef.current !== null) {
       cancelAnimationFrame(rafRef.current)
       rafRef.current = null
     }
-    if (instrumentRef.current) stopAll(instrumentRef.current)
+    stopSound()
     clockRef.current?.pause()
     setIsPlaying(false)
   }
@@ -40,9 +50,9 @@ function App() {
     const clock = clockRef.current
     if (!clock) return
     const t = clock.getCurrentTimeSec()
-    if (t >= duration) {
+    if (t >= playbackEndSec) {
       stopPlayback()
-      setTimeSec(duration)
+      setTimeSec(playbackEndSec)
       return
     }
     setTimeSec(t)
@@ -72,7 +82,7 @@ function App() {
 
     const clock = clockRef.current!
     clock.play(timeSec)
-    scheduleScore(instrumentRef.current, score, timeSec, ctx.currentTime)
+    activeStopFnsRef.current = scheduleScore(instrumentRef.current, score, timeSec, ctx.currentTime)
     setIsPlaying(true)
     rafRef.current = requestAnimationFrame(runLoop)
   }
@@ -80,21 +90,21 @@ function App() {
   function handleSeek(e: React.ChangeEvent<HTMLInputElement>) {
     const newTime = Number(e.target.value)
     setTimeSec(newTime)
+    stopSound()
 
     const ctx = audioCtxRef.current
     const clock = clockRef.current
     const instrument = instrumentRef.current
     if (isPlaying && ctx && clock && instrument && score) {
-      stopAll(instrument)
       clock.seek(newTime)
-      scheduleScore(instrument, score, newTime, ctx.currentTime)
+      activeStopFnsRef.current = scheduleScore(instrument, score, newTime, ctx.currentTime)
     }
   }
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
-    if (isPlaying) stopPlayback()
+    stopPlayback()
     const buffer = await file.arrayBuffer()
     setScore(parseMidi(buffer))
     setTimeSec(0)
@@ -109,7 +119,7 @@ function App() {
   useEffect(() => {
     return () => {
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
-      if (instrumentRef.current) stopAll(instrumentRef.current)
+      stopSound()
       audioCtxRef.current?.close()
     }
   }, [])
@@ -138,7 +148,7 @@ function App() {
         type="range"
         aria-label="Playback position"
         min={0}
-        max={duration}
+        max={playbackEndSec}
         step={0.01}
         value={timeSec}
         disabled={!score}
