@@ -25,6 +25,7 @@ A client-only web app that turns a MIDI score into a smalin-style scrolling musi
 - PDF/scanned score input (OMR — Audiveris or similar; unreliable, evaluate later)
 - Bar/ribbon note shapes as alternative to dots; connecting lines between consecutive notes of a voice
 - Presets/themes, piece library
+- Swappable/multiple soundfont support (M4 bundled `ChaosBank.sf2` for its CC0 license; a future milestone could let a different `.sf2` be swapped in/tested without re-litigating that choice)
 
 **Never:**
 - No auth, no database, no server-side rendering, no Supabase. Static site only.
