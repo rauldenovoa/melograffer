@@ -387,9 +387,15 @@ function App() {
       })
 
       const { width, height } = EXPORT_RESOLUTIONS[config.exportAspect]
+      // pxPerSec is an absolute px/s rate tuned for the live preview's
+      // CANVAS_WIDTH; scaling it by the export canvas's width ratio keeps
+      // the same number of seconds visible on screen (same look/feel as the
+      // preview) instead of the same raw pixel rate looking slower on a
+      // wider canvas.
+      const exportConfig = { ...config, pxPerSec: config.pxPerSec * (width / CANVAS_WIDTH) }
       const blob = await exportMp4({
         score,
-        config,
+        config: exportConfig,
         audioBuffer,
         width,
         height,
@@ -402,7 +408,7 @@ function App() {
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `melograffer-${baseName}.mp4`
+      a.download = `melograffer-${baseName}_${config.exportAspect}.mp4`
       a.click()
       URL.revokeObjectURL(url)
     } catch (err) {
