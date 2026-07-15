@@ -306,6 +306,31 @@ function App() {
     drawFrame(ctx, score, config, timeSec)
   }, [score, config, timeSec])
 
+  // Spacebar = play/pause, YouTube-style — but only when no form control has
+  // focus. A focused button/checkbox/slider keeps the browser's native space
+  // behavior (activate/toggle it), which is the standard.
+  const playPauseRef = useRef<() => void>(() => {})
+  playPauseRef.current = () => {
+    void handlePlayPause()
+  }
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.code !== 'Space' || e.repeat) return
+      const el = document.activeElement
+      if (
+        el instanceof HTMLElement &&
+        ['INPUT', 'BUTTON', 'SELECT', 'TEXTAREA'].includes(el.tagName)
+      ) {
+        return
+      }
+      e.preventDefault() // keep the page from scrolling
+      playPauseRef.current()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
+
   useEffect(() => {
     return () => {
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)

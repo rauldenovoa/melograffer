@@ -336,6 +336,34 @@ describe('App', () => {
     expect(Number(slider.value)).toBeCloseTo(target.startSec, 5)
   })
 
+  it('spacebar toggles play/pause when nothing interactive has focus, but not from a control', async () => {
+    render(<App />)
+    const buffer = readFileSync(resolve(__dirname, '../fixtures/multitrack.mid'))
+    fireEvent.change(document.querySelector('input[type="file"]')!, {
+      target: { files: [new File([buffer], 'multitrack.mid')] },
+    })
+    await waitFor(() => {
+      expect(screen.getByText(/staffA:/)).toBeInTheDocument()
+    })
+
+    // Focus on a form control: space must stay native (no play/pause hijack).
+    const speed = screen.getByRole('slider', { name: /scroll speed/i })
+    speed.focus()
+    fireEvent.keyDown(speed, { code: 'Space' })
+    expect(screen.getByRole('button', { name: /^play$/i })).toBeInTheDocument()
+
+    // Focus back on the page body: space toggles playback.
+    ;(document.activeElement as HTMLElement).blur()
+    fireEvent.keyDown(document.body, { code: 'Space' })
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /pause/i })).toBeInTheDocument()
+    })
+    fireEvent.keyDown(document.body, { code: 'Space' })
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /^play$/i })).toBeInTheDocument()
+    })
+  })
+
   it('starts the timeline two bars early and ends two bars after the last note (lead-in/out)', async () => {
     render(<App />)
     const buffer = readFileSync(resolve(__dirname, '../fixtures/multitrack.mid'))
