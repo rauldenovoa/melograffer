@@ -64,6 +64,20 @@
   text-align: center;
 }
 
+.external-audio {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin: 0.5rem 0;
+  font-size: 0.85rem;
+}
+
+.external-audio .config-row {
+  min-width: 280px;
+}
+
 .stage canvas {
   max-width: 100%;
   height: auto;

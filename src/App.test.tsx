@@ -16,15 +16,39 @@ vi.mock('./audio/instrument', () => ({
   }),
 }))
 
+interface FakeBufferSource {
+  buffer: unknown
+  connect: ReturnType<typeof vi.fn>
+  disconnect: ReturnType<typeof vi.fn>
+  start: ReturnType<typeof vi.fn>
+  stop: ReturnType<typeof vi.fn>
+}
+
+const bufferSources: FakeBufferSource[] = []
+
 class FakeAudioContext {
   currentTime = 0
+  destination = {}
   resume = vi.fn().mockResolvedValue(undefined)
   close = vi.fn().mockResolvedValue(undefined)
+  decodeAudioData = vi.fn().mockResolvedValue({ duration: 60 })
+  createBufferSource = vi.fn(() => {
+    const source: FakeBufferSource = {
+      buffer: null,
+      connect: vi.fn(),
+      disconnect: vi.fn(),
+      start: vi.fn(),
+      stop: vi.fn(),
+    }
+    bufferSources.push(source)
+    return source
+  })
 }
 vi.stubGlobal('AudioContext', FakeAudioContext)
 
 afterEach(() => {
   noteStopFns.length = 0
+  bufferSources.length = 0
   localStorage.clear()
 })
 
@@ -189,6 +213,53 @@ describe('App', () => {
     expect(rescheduled.length).toBeGreaterThan(0)
     expect(rescheduled.length).toBeLessThan(totalNotes)
     expect(rescheduled.every((stop) => stop.mock.calls.length === 0)).toBe(true)
+  })
+
+  it('uploading an audio file switches playback to it: no synth, offset slider live', async () => {
+    const { loadInstrument } = await import('./audio/instrument')
+    vi.mocked(loadInstrument).mockClear()
+
+    render(<App />)
+    const midiBuffer = readFileSync(resolve(__dirname, '../fixtures/multitrack.mid'))
+    fireEvent.change(document.querySelector('input[type="file"]')!, {
+      target: { files: [new File([midiBuffer], 'multitrack.mid')] },
+    })
+    await waitFor(() => {
+      expect(screen.getByText(/staffA:/)).toBeInTheDocument()
+    })
+
+    const audioInput = screen.getByLabelText(/audio file/i)
+    fireEvent.change(audioInput, {
+      target: { files: [new File([new Uint8Array([1, 2, 3])], 'render.mp3')] },
+    })
+    await waitFor(() => {
+      expect(screen.getByText(/render\.mp3/)).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /play/i }))
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /pause/i })).toBeInTheDocument()
+    })
+
+    // Flow 2 (SPEC §2): the uploaded file plays instead of the SoundFont synth.
+    expect(loadInstrument).not.toHaveBeenCalled()
+    expect(noteStopFns).toHaveLength(0)
+    expect(bufferSources).toHaveLength(1)
+    expect(bufferSources[0].start).toHaveBeenCalledWith(0, 0)
+
+    // Nudging the offset restarts the audio shifted by that many ms.
+    fireEvent.change(screen.getByRole('slider', { name: /audio offset/i }), {
+      target: { value: '-500' },
+    })
+    expect(bufferSources[0].stop).toHaveBeenCalled()
+    expect(bufferSources).toHaveLength(2)
+    expect(bufferSources[1].start).toHaveBeenCalledWith(0, 0.5)
+
+    // Removing the audio pauses and stops the external source.
+    fireEvent.click(screen.getByRole('button', { name: /remove/i }))
+    expect(bufferSources[1].stop).toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: /^play$/i })).toBeInTheDocument()
+    expect(screen.getByLabelText(/audio file/i)).toBeInTheDocument()
   })
 
   it('persists config changes to localStorage and restores them on next mount', async () => {

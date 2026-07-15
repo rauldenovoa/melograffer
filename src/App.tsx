@@ -6,6 +6,7 @@ import { scoreDurationSec } from './render/mapping'
 import { loadInstrument, type Instrument } from './audio/instrument'
 import { PlaybackClock } from './audio/clock'
 import { scheduleScore, stopAll } from './audio/scheduler'
+import { ExternalAudioPlayer } from './audio/externalAudio'
 import { loadVizConfig, saveVizConfig } from './config/storage'
 import { ConfigPanel, type TrackPatch } from './ConfigPanel'
 import type { Score } from './types'
@@ -13,17 +14,22 @@ import type { Score } from './types'
 const CANVAS_WIDTH = 960
 const CANVAS_HEIGHT = 360
 
+const MS_PER_SEC = 1000
+
 function App() {
   const [score, setScore] = useState<Score | null>(null)
   const [config, setConfig] = useState(() => loadVizConfig())
   const [timeSec, setTimeSec] = useState(0)
   const [isPlaying, setIsPlaying] = useState(false)
   const [isLoadingAudio, setIsLoadingAudio] = useState(false)
+  const [externalAudioName, setExternalAudioName] = useState<string | null>(null)
+  const [offsetMs, setOffsetMs] = useState(0)
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   const audioCtxRef = useRef<AudioContext | null>(null)
   const clockRef = useRef<PlaybackClock | null>(null)
   const instrumentRef = useRef<Instrument | null>(null)
+  const externalPlayerRef = useRef<ExternalAudioPlayer | null>(null)
   const activeStopFnsRef = useRef<Array<() => void>>([])
   const rafRef = useRef<number | null>(null)
 
@@ -41,9 +47,36 @@ function App() {
     saveVizConfig(config)
   }, [config])
 
+  function ensureAudioContext(): AudioContext {
+    let ctx = audioCtxRef.current
+    if (!ctx) {
+      ctx = new AudioContext()
+      audioCtxRef.current = ctx
+      clockRef.current = new PlaybackClock(() => ctx!.currentTime)
+    }
+    return ctx
+  }
+
   function stopSound() {
     stopAll(activeStopFnsRef.current)
     activeStopFnsRef.current = []
+  }
+
+  /**
+   * (Re)starts sound from a score-timeline position: the uploaded audio file
+   * when one is loaded (Flow 2), the SoundFont synth otherwise. Either way the
+   * stop handles land in activeStopFnsRef so every existing stop path
+   * (pause, seek, new file) works unchanged.
+   */
+  function startSoundAt(fromSec: number, forScore: Score, offsetMsNow: number) {
+    const ctx = audioCtxRef.current!
+    const external = externalPlayerRef.current
+    if (external) {
+      external.start(fromSec, offsetMsNow / MS_PER_SEC)
+      activeStopFnsRef.current = [() => external.stop()]
+    } else {
+      activeStopFnsRef.current = scheduleScore(instrumentRef.current!, forScore, fromSec, ctx.currentTime)
+    }
   }
 
   function stopPlayback() {
@@ -76,23 +109,17 @@ function App() {
     }
     if (!score) return
 
-    let ctx = audioCtxRef.current
-    if (!ctx) {
-      ctx = new AudioContext()
-      audioCtxRef.current = ctx
-      clockRef.current = new PlaybackClock(() => ctx!.currentTime)
-    }
+    const ctx = ensureAudioContext()
     await ctx.resume()
 
-    if (!instrumentRef.current) {
+    if (!externalPlayerRef.current && !instrumentRef.current) {
       setIsLoadingAudio(true)
       instrumentRef.current = await loadInstrument(ctx)
       setIsLoadingAudio(false)
     }
 
-    const clock = clockRef.current!
-    clock.play(timeSec)
-    activeStopFnsRef.current = scheduleScore(instrumentRef.current, score, timeSec, ctx.currentTime)
+    clockRef.current!.play(timeSec)
+    startSoundAt(timeSec, score, offsetMs)
     setIsPlaying(true)
     rafRef.current = requestAnimationFrame(runLoop)
   }
@@ -102,12 +129,19 @@ function App() {
     setTimeSec(newTime)
     stopSound()
 
-    const ctx = audioCtxRef.current
-    const clock = clockRef.current
-    const instrument = instrumentRef.current
-    if (isPlaying && ctx && clock && instrument && score) {
-      clock.seek(newTime)
-      activeStopFnsRef.current = scheduleScore(instrument, score, newTime, ctx.currentTime)
+    if (isPlaying && clockRef.current && score) {
+      clockRef.current.seek(newTime)
+      startSoundAt(newTime, score, offsetMs)
+    }
+  }
+
+  function handleOffsetChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const newOffsetMs = Number(e.target.value)
+    setOffsetMs(newOffsetMs)
+
+    if (isPlaying && externalPlayerRef.current && clockRef.current && score) {
+      stopSound()
+      startSoundAt(clockRef.current.getCurrentTimeSec(), score, newOffsetMs)
     }
   }
 
@@ -120,13 +154,18 @@ function App() {
     setScore(next)
 
     // Muting/unmuting a track mid-playback must be audible immediately, so
-    // reschedule from the current position (color changes are visual-only).
-    const ctx = audioCtxRef.current
+    // reschedule from the current position. Synth mode only: an uploaded
+    // audio file always sounds all its tracks (color changes are visual-only).
     const clock = clockRef.current
-    const instrument = instrumentRef.current
-    if ('visible' in patch && isPlaying && ctx && clock && instrument) {
+    if (
+      'visible' in patch &&
+      isPlaying &&
+      clock &&
+      instrumentRef.current &&
+      !externalPlayerRef.current
+    ) {
       stopSound()
-      activeStopFnsRef.current = scheduleScore(instrument, next, clock.getCurrentTimeSec(), ctx.currentTime)
+      startSoundAt(clock.getCurrentTimeSec(), next, offsetMs)
     }
   }
 
@@ -137,6 +176,23 @@ function App() {
     const buffer = await file.arrayBuffer()
     setScore(parseMidi(buffer))
     setTimeSec(0)
+  }
+
+  async function handleAudioFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    stopPlayback()
+    const ctx = ensureAudioContext()
+    const buffer = await ctx.decodeAudioData(await file.arrayBuffer())
+    externalPlayerRef.current = new ExternalAudioPlayer(ctx, buffer)
+    setExternalAudioName(file.name)
+  }
+
+  function handleRemoveExternalAudio() {
+    stopPlayback()
+    externalPlayerRef.current = null
+    setExternalAudioName(null)
+    setOffsetMs(0)
   }
 
   useEffect(() => {
@@ -165,7 +221,41 @@ function App() {
         />
         <div className="stage">
           <p>Drop a MIDI file to see its tracks.</p>
-          <input type="file" accept=".mid,.midi" onChange={handleFileChange} />
+          <input type="file" accept=".mid,.midi" aria-label="MIDI file" onChange={handleFileChange} />
+          <div className="external-audio">
+            {externalAudioName ? (
+              <>
+                <span>
+                  Audio: <strong>{externalAudioName}</strong>
+                </span>
+                <button type="button" onClick={handleRemoveExternalAudio}>
+                  Remove
+                </button>
+                <label className="config-row">
+                  <span>Audio offset ({offsetMs} ms)</span>
+                  <input
+                    type="range"
+                    aria-label="Audio offset"
+                    min={-1000}
+                    max={1000}
+                    step={5}
+                    value={offsetMs}
+                    onChange={handleOffsetChange}
+                  />
+                </label>
+              </>
+            ) : (
+              <label>
+                Audio file (optional, replaces synth):{' '}
+                <input
+                  type="file"
+                  accept="audio/*,.mp3,.wav"
+                  aria-label="Audio file"
+                  onChange={handleAudioFileChange}
+                />
+              </label>
+            )}
+          </div>
           <canvas ref={canvasRef} width={CANVAS_WIDTH} height={CANVAS_HEIGHT} />
           <div>
             <button onClick={handlePlayPause} disabled={!score || isLoadingAudio}>
