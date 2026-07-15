@@ -132,3 +132,51 @@ Verified in-browser (Chrome via the dev preview):
   than on a real user machine — the isolated checks above already validate
   pipeline correctness end-to-end.
 - `npm test` (109 tests), `npm run lint`, `npx tsc --noEmit` all clean.
+
+## Bug-fix round (2026-07-15, after real-world user testing)
+
+Real exports on the user's own machine + iPhone surfaced 5 issues the
+browser-sandbox verification above didn't catch:
+
+1. **Synth-only exports were completely silent** (external-audio exports were
+   fine). Root cause, found via a minimal `OfflineAudioContext` + `instrument
+   .start({ time })` repro: smplr's default `Scheduler` defers any note more
+   than ~200ms ahead of `currentTime` to a real `setInterval`-based lookahead
+   queue — required for live playback, but that timer never fires during an
+   `OfflineAudioContext`'s faster-than-realtime render, so effectively every
+   note in a real piece was silently dropped. Fixed in `instrument.ts`:
+   `loadInstrument` now passes `scheduler: Scheduler(ctx, { lookaheadMs:
+   Infinity })` to `Soundfont2` whenever `ctx instanceof OfflineAudioContext`,
+   forcing synchronous dispatch. Confirmed via the same repro (silent →
+   sounding) and a full `fur_elise.mid` render (audio present throughout).
+2. **Corrupted blank blocks along one edge after iPhone/iMessage roundtrip**
+   (AirDrop and a first-generation iMessage send were both fine — only after
+   iCloud's own re-compression touched the file). Best-supported hypothesis:
+   1920×1080/1080×1920 each have one side not divisible by 16, which H.264
+   pads internally and crops back via bitstream metadata (standard, universal
+   — true of virtually all 1080p video), but Apple's transcode pipeline
+   apparently doesn't respect that crop. Fixed defensively by switching
+   `EXPORT_RESOLUTIONS` to 1920×1088/1088×1920 (mod-16 on both sides, ~0.7%
+   aspect deviation, invisible) so no crop metadata is needed at all. Could
+   not reproduce Apple's transcode pipeline in this environment to confirm
+   directly — flagged to the user for re-test.
+3. **Large dots (long notes) popped into view abruptly at the right edge**
+   instead of scrolling in. `isNoteInWindow` (mapping.ts) only checked a
+   note's center against the window plus a fixed 40px pad — too small for a
+   dot whose radius (routinely 100px+ at 1080p) exceeds that pad. Fixed by
+   giving `isNoteInWindow` an optional `radiusSec` parameter and computing
+   each note's actual radius before culling (in `drawFrame`'s dot pass and
+   `findNoteAt`), instead of after.
+4. **Export scroll speed didn't visually match the preview.** `pxPerSec` is
+   an absolute px/s rate tuned for the live preview's fixed 960px canvas;
+   exporting at 1920px wide with the same raw rate shows ~2x more seconds of
+   timeline on screen, looking slower. Fixed in `App.tsx`'s `handleExport`:
+   scales `pxPerSec` by `exportWidth / CANVAS_WIDTH` before passing the
+   config to `exportMp4`.
+5. **Filename collision** between landscape/portrait exports of the same
+   file. Fixed by appending `_landscape`/`_portrait` to the downloaded name.
+
+All fixed in 4 follow-up commits (`e544ae1`, `a7331fe`, `13b1d18`, `3d750a9`).
+108 tests / lint / typecheck clean after each. #2 is the one fix that
+couldn't be directly verified in this environment (no iPhone/iMessage access)
+— everything else was confirmed either via a targeted repro or a full render.
