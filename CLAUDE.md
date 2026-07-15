@@ -23,13 +23,26 @@ Vite · React 18 · TypeScript strict · Canvas 2D · @tonejs/midi · WebCodecs 
 - Conventional commits; commit per milestone task.
 
 ## Current state
-- Milestone: 4 — Audio playback + live sync (see SPEC.md §6) — DONE
-- Done: `src/audio/{clock,instrument,scheduler}.ts` + Play/Pause/seek in `App.tsx`
-  (rAF-driven `timeSec`, never Date.now/performance.now). Audio schedules notes
-  straight from `Score` (no second MIDI parse). SoundFont `public/soundfonts/
-  ChaosBank.sf2` (CC0 1.0, rKhive) over GPLv2 `TimGM6mb.sf2` — deliberate,
-  see SPEC §3 "swappable soundfont". Fixture `fixtures/fur_elise.mid` added
-  for the §8 drift check. Offline-render smoke-tested — de-risks M6.
+- Milestone: 5 — Config UI + external audio (see SPEC.md §6) — DONE
+- M5 done: `Score.bars` (measure starts from the time-signature map,
+  4/4 fallback, computed in `parseMidi`); `drawFrame` draws bar lines +
+  numbers and per-voice connecting lines behind the dots (3 new VizConfig
+  toggles); config sidebar `src/ConfigPanel.tsx` (track show/hide + color,
+  bg, speed, dot scale, radius mode, playhead, toggles) persisted via
+  `src/config/storage.ts` (localStorage, field-by-field validation);
+  external audio (Flow 2) in `src/audio/externalAudio.ts` — uploaded
+  mp3/wav plays via AudioBufferSourceNode instead of the synth, ±1000ms
+  offset slider restarts the source live; hiding a track mid-play
+  reschedules synth audio; scroll-off buffer now derives from live
+  `pxPerSec` (old baked-in constant trap resolved); debug note counters
+  removed.
+- M4 done: `src/audio/{clock,instrument,scheduler}.ts` + Play/Pause/seek in
+  `App.tsx` (rAF-driven `timeSec`, never Date.now/performance.now). Audio
+  schedules notes straight from `Score` (no second MIDI parse). SoundFont
+  `public/soundfonts/ChaosBank.sf2` (CC0 1.0, rKhive) over GPLv2
+  `TimGM6mb.sf2` — deliberate, see SPEC §3 "swappable soundfont". Fixture
+  `fixtures/fur_elise.mid` added for the §8 drift check. Offline-render
+  smoke-tested — de-risks M6.
 - SF2 bugs RESOLVED (2026-07-14): smplr's SF2→preset conversion reads only raw
   sample headers, ignoring zone generators. Two audible consequences, both
   fixed by `applyZoneGenerators` (instrument.ts): (1) pitch — root key lives
@@ -38,18 +51,22 @@ Vite · React 18 · TypeScript strict · Canvas 2D · @tonejs/midi · WebCodecs 
   nominal whole-sample loop to a short sustain tail, and gen 54 defaults to
   no-loop; ignoring them re-struck the attack every loop wrap on held notes.
   Don't resurrect "parse pitch from sample name" — dead end, checked.
-- Known simplifications / traps: no devicePixelRatio scaling; no config UI
-  (M5) — `SCROLL_OFF_BUFFER_SEC` (App.tsx) bakes in `pxPerSec`, must recompute
-  once editable; one shared instrument for all tracks — smplr still drops
+- Known simplifications / traps: no devicePixelRatio scaling; VizConfig
+  persists but per-track colors/visibility are session-only (reset on file
+  load — per-file persistence would need a file identity key, deferred);
+  external-audio offset is session-only too; playback end is MIDI-driven, so
+  an external audio file longer than the MIDI gets cut off at scroll-out;
+  one shared instrument for all tracks — smplr still drops
   velRange/vol-envelope/tuning generators (only 58+54+2/3/45/50 patched), so
   per-track GM instruments may hit layered patches; the `/piano/i` name
   heuristic is file-specific (GeneralUser.sf2 has no "piano" name at all —
   smplr reads low-level instrument names, not presets); scheduler.ts's
   upfront full-piece scheduling is untested at SPEC §5's dense-orchestral
   scale; M6's exporter needs explicit note durations — scheduler.ts's
-  setTimeout note-offs never fire in a faster-than-realtime offline render.
-  Per-track "note N/total" counters in the track list are debug UI, may go.
-- Next: Milestone 5 — Config UI + external audio
+  setTimeout note-offs never fire in a faster-than-realtime offline render,
+  and in external-audio mode the exporter must pull audio from the uploaded
+  buffer (offset-shifted), not the synth.
+- Next: Milestone 6 — MP4 export
 <!-- Update this section at the end of every session; it replaces chat history. -->
 
 ## Rules
