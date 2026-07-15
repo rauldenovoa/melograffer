@@ -30,6 +30,11 @@ A client-only web app that turns a MIDI score into a smalin-style scrolling musi
 - Harmonic coloring option (musanim.com/HarmonicColoring/)
 - "Organic" scroll: nonlinear (e.g. logarithmic) time-axis warp that eases around the currently-sounding note instead of constant-speed scroll
 - SF2 volume envelope (ADSR): smplr ignores it, so notes cut off abruptly at release instead of decaying naturally — audio-quality polish, not urgent
+- MIDI instrument selector (global): a sidebar dropdown to switch which soundfont instrument the synth plays, using smplr's existing `instrumentNames`/`loadInstrument(name)`. MIDI files don't embed audio — they carry per-track "program change" hints that are only advisory; today we ignore them and always play the `/piano/i` match (see instrument.ts). Low effort whenever wanted.
+- Per-track instruments honoring each track's actual GM program number (GM = General MIDI, the standard 128-slot program-number → instrument-sound mapping, e.g. program 0 = Acoustic Grand Piano, 40 = Violin). Harder than the global selector: smplr's SF2 loader reads the soundfont's own low-level instrument names, not GM preset numbers, and ChaosBank.sf2's naming doesn't line up cleanly with GM — needs a real program-number → instrument-name mapping table for the loaded soundfont.
+- Sounding-note clone: toggle to have it track the melody line vertically (still riding the playhead horizontally, but y-position follows whichever pitch is currently sounding) instead of the current fixed-position behavior.
+- Sounding-note outline: try flashing brighter than the dot's base color (vs. today's full-opacity-then-decay of the same color) — worth an A/B look.
+- Multi-note-per-voice-at-once behavior (e.g. LH bass line + RH chords, or vice versa): current connecting-lines/clone logic assumes one sounding note per voice at a time; revisit how it should look when a track has simultaneous notes (chords).
 
 **Never:**
 - No auth, no database, no server-side rendering, no Supabase. Static site only.
