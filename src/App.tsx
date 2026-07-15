@@ -377,7 +377,9 @@ function App() {
 
   return (
     <main className="app">
-      <h1>Melograffer</h1>
+      <h1>
+        <img src="/images/melograffer_title_dark.png" alt="Melograffer" className="title-image" />
+      </h1>
       <div className="layout">
         <ConfigPanel
           config={config}
