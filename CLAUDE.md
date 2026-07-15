@@ -87,7 +87,7 @@ Vite · React 18 · TypeScript strict · Canvas 2D · @tonejs/midi · WebCodecs 
   scheduler.ts's upfront full-piece scheduling is untested at SPEC §5's
   dense-orchestral scale; M6's bar-line/number text and line widths don't
   scale with export resolution the way dot radius does (cosmetic, not fixed).
-- Next: nothing assigned — see BACKLOG.md for unscheduled work.
+- Next: M7 (website/app UI design revamp) — see SPEC.md §6 for M7-M14, BACKLOG.md for unscheduled ("Later") work.
 <!-- Update this section at the end of every session; it replaces chat history. -->
 
 ## Rules
