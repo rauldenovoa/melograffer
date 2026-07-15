@@ -41,4 +41,6 @@ export interface VizConfig {
   leadOutBars: number
   /** Persisted instrument choice; '' means "use the synth's built-in default". */
   instrumentName: string
+  /** MP4 export aspect preset: 'landscape' = 1920x1080 (YouTube), 'portrait' = 1080x1920 (Reels/Stories). */
+  exportAspect: 'landscape' | 'portrait'
 }

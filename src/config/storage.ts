@@ -31,6 +31,7 @@ export function loadVizConfig(storage: StorageLike = localStorage): VizConfig {
     if (typeof value !== typeof DEFAULT_VIZ_CONFIG[key]) continue
     if (typeof value === 'number' && !Number.isFinite(value)) continue
     if (key === 'radiusMode' && value !== 'sqrt' && value !== 'linear') continue
+    if (key === 'exportAspect' && value !== 'landscape' && value !== 'portrait') continue
     // Same-typed, validated value — the cast is safe per the checks above.
     ;(config[key] as unknown) = value
   }

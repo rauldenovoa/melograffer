@@ -12,4 +12,5 @@ export const DEFAULT_VIZ_CONFIG: VizConfig = {
   leadInBars: 2,
   leadOutBars: 2,
   instrumentName: '',
+  exportAspect: 'landscape',
 }

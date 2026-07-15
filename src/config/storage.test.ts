@@ -27,6 +27,7 @@ describe('loadVizConfig / saveVizConfig', () => {
       leadInBars: 4,
       leadOutBars: 0,
       instrumentName: 'Trumpet Section',
+      exportAspect: 'portrait',
     }
     saveVizConfig(config)
     expect(loadVizConfig()).toEqual(config)
@@ -47,6 +48,7 @@ describe('loadVizConfig / saveVizConfig', () => {
         radiusMode: 'cubic', // not an allowed variant
         playheadX: 4, // out of range → clamped
         showBarLines: false,
+        exportAspect: 'square', // not an allowed variant
         unknownKey: 'ignored',
       }),
     )
@@ -56,6 +58,7 @@ describe('loadVizConfig / saveVizConfig', () => {
     expect(config.pxPerSec).toBe(DEFAULT_VIZ_CONFIG.pxPerSec)
     expect(config.radiusMode).toBe(DEFAULT_VIZ_CONFIG.radiusMode)
     expect(config.playheadX).toBe(1)
+    expect(config.exportAspect).toBe(DEFAULT_VIZ_CONFIG.exportAspect)
     expect('unknownKey' in config).toBe(false)
   })
 })
