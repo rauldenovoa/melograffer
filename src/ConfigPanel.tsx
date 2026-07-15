@@ -132,6 +132,38 @@ export function ConfigPanel({ config, onConfigChange, score, onTrackChange }: Co
           Reset to defaults
         </button>
       </fieldset>
+
+      <fieldset>
+        <legend>Timing</legend>
+        <label className="config-row">
+          <span>Lead-in (bars)</span>
+          <input
+            type="number"
+            aria-label="Lead-in bars"
+            min={0}
+            max={16}
+            value={config.leadInBars}
+            onChange={(e) => {
+              const bars = Number(e.target.value)
+              if (Number.isFinite(bars)) set('leadInBars', Math.min(Math.max(bars, 0), 16))
+            }}
+          />
+        </label>
+        <label className="config-row">
+          <span>Lead-out (bars)</span>
+          <input
+            type="number"
+            aria-label="Lead-out bars"
+            min={0}
+            max={16}
+            value={config.leadOutBars}
+            onChange={(e) => {
+              const bars = Number(e.target.value)
+              if (Number.isFinite(bars)) set('leadOutBars', Math.min(Math.max(bars, 0), 16))
+            }}
+          />
+        </label>
+      </fieldset>
     </aside>
   )
 }

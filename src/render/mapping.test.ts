@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  barDurationsSec,
   computePitchRange,
   isNoteActive,
   isNoteInWindow,
@@ -99,6 +100,25 @@ describe('visibleTimeWindow / isNoteInWindow', () => {
     const justOutside = note({ startSec: window.endSec + 1 })
     expect(isNoteInWindow(justInside, window)).toBe(true)
     expect(isNoteInWindow(justOutside, window)).toBe(false)
+  })
+})
+
+describe('barDurationsSec', () => {
+  it('measures the first and last bar separately (tempo may differ)', () => {
+    const score: Score = {
+      ...scoreOf([]),
+      bars: [
+        { number: 1, startSec: 0 },
+        { number: 2, startSec: 2 },
+        { number: 3, startSec: 3.5 }, // faster tempo at the end
+        { number: 4, startSec: 5 },
+      ],
+    }
+    expect(barDurationsSec(score)).toEqual({ first: 2, last: 1.5 })
+  })
+
+  it('falls back to 2s bars when the score has fewer than two bars', () => {
+    expect(barDurationsSec(scoreOf([]))).toEqual({ first: 2, last: 2 })
   })
 })
 

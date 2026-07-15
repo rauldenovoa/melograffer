@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 import { parseMidi } from './midi/parseMidi'
 import { drawFrame } from './render/drawFrame'
-import { scoreDurationSec } from './render/mapping'
+import { barDurationsSec, scoreDurationSec } from './render/mapping'
 import { loadInstrument, type Instrument } from './audio/instrument'
 import { PlaybackClock } from './audio/clock'
 import { scheduleScore, stopAll } from './audio/scheduler'
@@ -34,10 +34,15 @@ function App() {
   const rafRef = useRef<number | null>(null)
 
   const duration = useMemo(() => (score ? scoreDurationSec(score) : 0), [score])
-  // Extra time after the last note so its dot scrolls fully off-screen instead
-  // of freezing mid-flight. Derived from the live config: scroll speed is
-  // editable now, so this can't be a module constant.
-  const playbackEndSec = duration + CANVAS_WIDTH / config.pxPerSec
+  const barSec = useMemo(
+    () => (score ? barDurationsSec(score) : { first: 0, last: 0 }),
+    [score],
+  )
+  // Lead-in silence runs on negative timeline seconds; lead-out replaces the
+  // old automatic scroll-off buffer (user-controlled now, 0 = stop on the
+  // last note even if dots freeze mid-canvas).
+  const playbackStartSec = -config.leadInBars * barSec.first
+  const playbackEndSec = duration + config.leadOutBars * barSec.last
   // The rAF loop's closure goes stale across re-renders; it reads the current
   // end time through this ref instead.
   const playbackEndRef = useRef(playbackEndSec)
@@ -118,8 +123,11 @@ function App() {
       setIsLoadingAudio(false)
     }
 
-    clockRef.current!.play(timeSec)
-    startSoundAt(timeSec, score, offsetMs)
+    // Playing from the very end restarts from the top (lead-in included).
+    const startFrom = timeSec >= playbackEndSec ? playbackStartSec : timeSec
+    setTimeSec(startFrom)
+    clockRef.current!.play(startFrom)
+    startSoundAt(startFrom, score, offsetMs)
     setIsPlaying(true)
     rafRef.current = requestAnimationFrame(runLoop)
   }
@@ -174,8 +182,9 @@ function App() {
     if (!file) return
     stopPlayback()
     const buffer = await file.arrayBuffer()
-    setScore(parseMidi(buffer))
-    setTimeSec(0)
+    const newScore = parseMidi(buffer)
+    setScore(newScore)
+    setTimeSec(-config.leadInBars * barDurationsSec(newScore).first)
   }
 
   async function handleAudioFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -266,10 +275,10 @@ function App() {
             type="range"
             className="scrub"
             aria-label="Playback position"
-            min={0}
+            min={playbackStartSec}
             max={playbackEndSec}
             step={0.01}
-            value={Math.min(timeSec, playbackEndSec)}
+            value={Math.min(Math.max(timeSec, playbackStartSec), playbackEndSec)}
             disabled={!score}
             onChange={handleSeek}
           />

@@ -24,6 +24,8 @@ describe('loadVizConfig / saveVizConfig', () => {
       showBarLines: false,
       showBarNumbers: false,
       showConnectingLines: false,
+      leadInBars: 4,
+      leadOutBars: 0,
     }
     saveVizConfig(config)
     expect(loadVizConfig()).toEqual(config)

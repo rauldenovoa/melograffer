@@ -245,21 +245,50 @@ describe('App', () => {
     expect(loadInstrument).not.toHaveBeenCalled()
     expect(noteStopFns).toHaveLength(0)
     expect(bufferSources).toHaveLength(1)
-    expect(bufferSources[0].start).toHaveBeenCalledWith(0, 0)
+    // Playback begins at the (negative) lead-in, so the audio is scheduled to
+    // start after exactly the lead-in delay, from the top of the buffer.
+    const leadInSec = -Number(
+      (screen.getByRole('slider', { name: /playback position/i }) as HTMLInputElement).min,
+    )
+    expect(leadInSec).toBeGreaterThan(0)
+    expect(bufferSources[0].start).toHaveBeenCalledWith(leadInSec, 0)
 
-    // Nudging the offset restarts the audio shifted by that many ms.
+    // Nudging the offset restarts the audio shifted by that many ms
+    // (fake clock is still at the lead-in start, so -500ms of offset moves
+    // the delayed start 0.5s earlier).
     fireEvent.change(screen.getByRole('slider', { name: /audio offset/i }), {
       target: { value: '-500' },
     })
     expect(bufferSources[0].stop).toHaveBeenCalled()
     expect(bufferSources).toHaveLength(2)
-    expect(bufferSources[1].start).toHaveBeenCalledWith(0, 0.5)
+    expect(bufferSources[1].start).toHaveBeenCalledWith(leadInSec - 0.5, 0)
 
     // Removing the audio pauses and stops the external source.
     fireEvent.click(screen.getByRole('button', { name: /remove/i }))
     expect(bufferSources[1].stop).toHaveBeenCalled()
     expect(screen.getByRole('button', { name: /^play$/i })).toBeInTheDocument()
     expect(screen.getByLabelText(/audio file/i)).toBeInTheDocument()
+  })
+
+  it('starts the timeline two bars early and ends two bars after the last note (lead-in/out)', async () => {
+    render(<App />)
+    const buffer = readFileSync(resolve(__dirname, '../fixtures/multitrack.mid'))
+    fireEvent.change(document.querySelector('input[type="file"]')!, {
+      target: { files: [new File([buffer], 'multitrack.mid')] },
+    })
+    await waitFor(() => {
+      expect(screen.getByText(/staffA:/)).toBeInTheDocument()
+    })
+
+    const slider = screen.getByRole('slider', { name: /playback position/i }) as HTMLInputElement
+    const min = Number(slider.min)
+    const max = Number(slider.max)
+    expect(min).toBeLessThan(0)
+    // Position starts at the very beginning of the lead-in.
+    expect(Number(slider.value)).toBeCloseTo(min)
+    // Last note of multitrack.mid ends at ~43.64s; lead-out pushes max past it
+    // by exactly the lead-in's magnitude (constant tempo, both are 2 bars).
+    expect(max).toBeCloseTo(43.64 - min, 1)
   })
 
   it('persists config changes to localStorage and restores them on next mount', async () => {

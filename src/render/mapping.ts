@@ -99,6 +99,22 @@ export function isNoteInWindow(note: Note, window: TimeWindow): boolean {
   return note.startSec >= window.startSec && note.startSec <= window.endSec
 }
 
+/** 4/4 at 120bpm — used when a score has too few bars to measure one. */
+const FALLBACK_BAR_SEC = 2
+
+/**
+ * Duration of the score's first and last measured bar, for sizing the
+ * lead-in/lead-out silence in "bars" even when tempo changes mid-piece.
+ */
+export function barDurationsSec(score: Score): { first: number; last: number } {
+  const bars = score.bars
+  if (bars.length < 2) return { first: FALLBACK_BAR_SEC, last: FALLBACK_BAR_SEC }
+  return {
+    first: bars[1].startSec - bars[0].startSec,
+    last: bars[bars.length - 1].startSec - bars[bars.length - 2].startSec,
+  }
+}
+
 export function scoreDurationSec(score: Score): number {
   let max = 0
   for (const track of score.tracks) {

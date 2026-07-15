@@ -9,4 +9,6 @@ export const DEFAULT_VIZ_CONFIG: VizConfig = {
   showBarLines: true,
   showBarNumbers: true,
   showConnectingLines: true,
+  leadInBars: 2,
+  leadOutBars: 2,
 }

@@ -35,4 +35,8 @@ export interface VizConfig {
   showBarNumbers: boolean
   /** Lines connecting consecutive notes within a voice (MAM "part motion" look). */
   showConnectingLines: boolean
+  /** Silent bars before the first note (playback starts at negative time). */
+  leadInBars: number
+  /** Silent bars after the last note before playback stops. */
+  leadOutBars: number
 }
