@@ -44,6 +44,7 @@ A client-only web app that turns a MIDI score into a smalin-style scrolling musi
 16. MusicXML input (easy add; do after MVP proves the pipeline).
 17. Real-recording alignment: separate offline Python tool (synctoolbox/librosa DTW → tempo map → warped MIDI that this app consumes unchanged). Do NOT build into the web app.
 18. PDF/scanned score input (OMR — Audiveris or similar; unreliable, evaluate later).
+19. WebM/MediaRecorder fallback for the MP4 exporter, for browsers without WebCodecs H.264+AAC support (M6 shipped WebCodecs-only, Chrome/Edge; SPEC §5 already accepts this for a personal tool).
 
 **Never:**
 - No auth, no database, no server-side rendering, no Supabase. Static site only.
