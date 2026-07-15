@@ -15,10 +15,22 @@ const KEYFRAME_INTERVAL_FRAMES = EXPORT_FPS * 2
 const MAX_ENCODE_QUEUE_SIZE = 2
 const AUDIO_CHUNK_SECONDS = 1
 
-/** Output pixel dimensions for each SPEC §3 platform preset. */
+/**
+ * Output pixel dimensions for each SPEC §3 platform preset. 1088 (not 1080)
+ * on the non-16:9-exact side: H.264 macroblocks are always 16px, so a coded
+ * height/width of 1080 is padded to 1088 internally regardless and trimmed
+ * back via cropping metadata — standard and universally supported by
+ * spec-compliant decoders, but reportedly mishandled by at least one
+ * real-world re-encoding pipeline (Apple's iMessage/iCloud sync transcode),
+ * which showed corrupted blocks along the padded edge after their transcode
+ * even though direct playback (AirDrop, first-generation iMessage send) was
+ * fine. Using dimensions that are already multiples of 16 removes the need
+ * for any crop metadata at all, at a ~0.7% aspect-ratio deviation from exact
+ * 16:9 (imperceptible, and still "1080p" in every practical sense).
+ */
 export const EXPORT_RESOLUTIONS: Record<VizConfig['exportAspect'], { width: number; height: number }> = {
-  landscape: { width: 1920, height: 1080 }, // YouTube 16:9
-  portrait: { width: 1080, height: 1920 }, // Instagram Reels/Stories/feed 9:16
+  landscape: { width: 1920, height: 1088 }, // YouTube 16:9
+  portrait: { width: 1088, height: 1920 }, // Instagram Reels/Stories/feed 9:16
 }
 
 /** Thrown when the browser lacks WebCodecs or can't encode the SPEC-mandated H.264+AAC config. */
