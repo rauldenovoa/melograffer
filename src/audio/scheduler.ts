@@ -54,3 +54,29 @@ export function scheduleScore(
 export function stopAll(cancelFns: Array<() => void>): void {
   for (const cancel of cancelFns) cancel()
 }
+
+/**
+ * Offline counterpart of scheduleScore, for the M6 exporter's OfflineAudioContext
+ * render. A faster-than-realtime offline render never reaches a real
+ * setTimeout, so scheduleScore's own-timer note-off approach can't apply here
+ * (CLAUDE.md's noted M6 trap) — instead every note is scheduled with an
+ * explicit `duration` so smplr ends it itself.
+ */
+export function scheduleScoreOffline(instrument: Instrument, score: Score, fromSec: number): void {
+  for (const track of score.tracks) {
+    if (!track.visible) continue
+
+    for (const note of track.notes) {
+      const endSec = note.startSec + note.durationSec
+      if (endSec <= fromSec) continue
+
+      const soundingFromSec = Math.max(note.startSec, fromSec)
+      instrument.start({
+        note: note.midiNote,
+        velocity: Math.round(note.velocity * MIDI_VELOCITY_SCALE),
+        time: soundingFromSec - fromSec,
+        duration: endSec - soundingFromSec,
+      })
+    }
+  }
+}

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Score } from '../types'
-import { scheduleScore, stopAll } from './scheduler'
+import { scheduleScore, scheduleScoreOffline, stopAll } from './scheduler'
 import type { Instrument } from './instrument'
 
 function fakeInstrument(): Instrument & { start: ReturnType<typeof vi.fn> } {
@@ -109,6 +109,48 @@ describe('scheduleScore', () => {
     // The natural-end timer must have been cleared — advancing past it must not call stop again.
     vi.advanceTimersByTime(10000)
     expect(stopVoice).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('scheduleScoreOffline', () => {
+  it('schedules every note with an explicit duration, relative to fromSec, and returns nothing to cancel', () => {
+    const instrument = fakeInstrument()
+    scheduleScoreOffline(instrument, score(), 0)
+
+    expect(instrument.start).toHaveBeenCalledTimes(3)
+    expect(instrument.start).toHaveBeenNthCalledWith(1, { note: 60, velocity: 127, time: 0, duration: 1 })
+    expect(instrument.start).toHaveBeenNthCalledWith(2, { note: 62, velocity: 64, time: 1, duration: 1 })
+    expect(instrument.start).toHaveBeenNthCalledWith(3, { note: 64, velocity: 0, time: 5, duration: 2 })
+  })
+
+  it('skips notes that fully finished before fromSec', () => {
+    const instrument = fakeInstrument()
+    scheduleScoreOffline(instrument, score(), 3)
+
+    expect(instrument.start).toHaveBeenCalledTimes(1)
+    expect(instrument.start).toHaveBeenCalledWith({ note: 64, velocity: 0, time: 2, duration: 2 })
+  })
+
+  it('shortens a note already in progress at fromSec instead of re-triggering its full duration', () => {
+    const instrument = fakeInstrument()
+    scheduleScoreOffline(instrument, score(), 6)
+
+    expect(instrument.start).toHaveBeenCalledTimes(1)
+    expect(instrument.start).toHaveBeenCalledWith({ note: 64, velocity: 0, time: 0, duration: 1 })
+  })
+
+  it('skips hidden tracks', () => {
+    const instrument = fakeInstrument()
+    scheduleScoreOffline(instrument, score({ visible: false }), 0)
+
+    expect(instrument.start).not.toHaveBeenCalled()
+  })
+
+  it('never sets a setTimeout (safe for faster-than-realtime offline rendering)', () => {
+    const instrument = fakeInstrument()
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout')
+    scheduleScoreOffline(instrument, score(), 0)
+    expect(setTimeoutSpy).not.toHaveBeenCalled()
   })
 })
 

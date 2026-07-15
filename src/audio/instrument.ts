@@ -90,13 +90,21 @@ export function applyZoneGenerators(sf2: SoundFont2) {
 
 export interface Instrument {
   /**
-   * Starts a note with no end time and returns a function that stops it.
-   * Deliberately excludes `duration` — smplr pre-schedules a note's own
+   * Starts a note and returns a function that stops it.
+   *
+   * `duration` is optional and deliberately excluded by the live scheduler
+   * (scheduler.ts's `scheduleScore`): smplr pre-schedules a note's own
    * release the moment `duration` is passed to it, which consumes the
-   * underlying voice's one-shot (idempotent) stop() call and makes any
-   * later stop from us a silent no-op. Callers own ending the note.
+   * underlying voice's one-shot (idempotent) stop() call and makes any later
+   * manual stop a silent no-op — the live path needs that manual stop for
+   * pause/seek/new-file cancellation, so it owns ending the note itself.
+   *
+   * The offline exporter (`scheduleScoreOffline`) has no such cancellation
+   * need and no wall-clock setTimeout to fire it (a faster-than-realtime
+   * OfflineAudioContext render never reaches a real setTimeout), so it does
+   * pass `duration` and lets smplr schedule the release directly.
    */
-  start(opts: { note: number; velocity: number; time: number }): () => void
+  start(opts: { note: number; velocity: number; time: number; duration?: number }): () => void
   /** Every instrument name in the loaded soundfont, for a selector UI. */
   instrumentNames: string[]
   /** The name PREFERRED_INSTRUMENT_PATTERN resolved to at load time. */
