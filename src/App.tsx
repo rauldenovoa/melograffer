@@ -2,21 +2,20 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 import { parseMidi } from './midi/parseMidi'
 import { drawFrame } from './render/drawFrame'
-import { DEFAULT_VIZ_CONFIG } from './render/defaultConfig'
 import { scoreDurationSec } from './render/mapping'
 import { loadInstrument, type Instrument } from './audio/instrument'
 import { PlaybackClock } from './audio/clock'
 import { scheduleScore, stopAll } from './audio/scheduler'
+import { loadVizConfig, saveVizConfig } from './config/storage'
+import { ConfigPanel, type TrackPatch } from './ConfigPanel'
 import type { Score } from './types'
 
 const CANVAS_WIDTH = 960
 const CANVAS_HEIGHT = 360
 
-/** Extra time after the last note so its dot scrolls fully off-screen instead of freezing mid-flight. */
-const SCROLL_OFF_BUFFER_SEC = CANVAS_WIDTH / DEFAULT_VIZ_CONFIG.pxPerSec
-
 function App() {
   const [score, setScore] = useState<Score | null>(null)
+  const [config, setConfig] = useState(() => loadVizConfig())
   const [timeSec, setTimeSec] = useState(0)
   const [isPlaying, setIsPlaying] = useState(false)
   const [isLoadingAudio, setIsLoadingAudio] = useState(false)
@@ -29,7 +28,18 @@ function App() {
   const rafRef = useRef<number | null>(null)
 
   const duration = useMemo(() => (score ? scoreDurationSec(score) : 0), [score])
-  const playbackEndSec = duration + SCROLL_OFF_BUFFER_SEC
+  // Extra time after the last note so its dot scrolls fully off-screen instead
+  // of freezing mid-flight. Derived from the live config: scroll speed is
+  // editable now, so this can't be a module constant.
+  const playbackEndSec = duration + CANVAS_WIDTH / config.pxPerSec
+  // The rAF loop's closure goes stale across re-renders; it reads the current
+  // end time through this ref instead.
+  const playbackEndRef = useRef(playbackEndSec)
+  playbackEndRef.current = playbackEndSec
+
+  useEffect(() => {
+    saveVizConfig(config)
+  }, [config])
 
   function stopSound() {
     stopAll(activeStopFnsRef.current)
@@ -50,9 +60,9 @@ function App() {
     const clock = clockRef.current
     if (!clock) return
     const t = clock.getCurrentTimeSec()
-    if (t >= playbackEndSec) {
+    if (t >= playbackEndRef.current) {
       stopPlayback()
-      setTimeSec(playbackEndSec)
+      setTimeSec(playbackEndRef.current)
       return
     }
     setTimeSec(t)
@@ -101,6 +111,25 @@ function App() {
     }
   }
 
+  function handleTrackChange(trackId: string, patch: TrackPatch) {
+    if (!score) return
+    const next: Score = {
+      ...score,
+      tracks: score.tracks.map((t) => (t.id === trackId ? { ...t, ...patch } : t)),
+    }
+    setScore(next)
+
+    // Muting/unmuting a track mid-playback must be audible immediately, so
+    // reschedule from the current position (color changes are visual-only).
+    const ctx = audioCtxRef.current
+    const clock = clockRef.current
+    const instrument = instrumentRef.current
+    if ('visible' in patch && isPlaying && ctx && clock && instrument) {
+      stopSound()
+      activeStopFnsRef.current = scheduleScore(instrument, next, clock.getCurrentTimeSec(), ctx.currentTime)
+    }
+  }
+
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
@@ -113,8 +142,8 @@ function App() {
   useEffect(() => {
     const ctx = canvasRef.current?.getContext('2d')
     if (!ctx || !score) return
-    drawFrame(ctx, score, DEFAULT_VIZ_CONFIG, timeSec)
-  }, [score, timeSec])
+    drawFrame(ctx, score, config, timeSec)
+  }, [score, config, timeSec])
 
   useEffect(() => {
     return () => {
@@ -127,40 +156,35 @@ function App() {
   return (
     <main className="app">
       <h1>Melograffer</h1>
-      <p>Drop a MIDI file to see its tracks.</p>
-      <input type="file" accept=".mid,.midi" onChange={handleFileChange} />
-      {score && (
-        <ul>
-          {score.tracks.map((track) => {
-            // Troubleshooting counter: 1-based index of the most recent note
-            // that has started by timeSec, so a heard glitch can be reported
-            // as an exact note number. Notes are in start-time order.
-            const startedCount = track.notes.filter((n) => n.startSec <= timeSec).length
-            return (
-              <li key={track.id}>
-                <span style={{ color: track.color }}>●</span> {track.name} — note{' '}
-                {startedCount}/{track.notes.length}
-              </li>
-            )
-          })}
-        </ul>
-      )}
-      <canvas ref={canvasRef} width={CANVAS_WIDTH} height={CANVAS_HEIGHT} />
-      <div>
-        <button onClick={handlePlayPause} disabled={!score || isLoadingAudio}>
-          {isLoadingAudio ? 'Loading…' : isPlaying ? 'Pause' : 'Play'}
-        </button>
+      <div className="layout">
+        <ConfigPanel
+          config={config}
+          onConfigChange={setConfig}
+          score={score}
+          onTrackChange={handleTrackChange}
+        />
+        <div className="stage">
+          <p>Drop a MIDI file to see its tracks.</p>
+          <input type="file" accept=".mid,.midi" onChange={handleFileChange} />
+          <canvas ref={canvasRef} width={CANVAS_WIDTH} height={CANVAS_HEIGHT} />
+          <div>
+            <button onClick={handlePlayPause} disabled={!score || isLoadingAudio}>
+              {isLoadingAudio ? 'Loading…' : isPlaying ? 'Pause' : 'Play'}
+            </button>
+          </div>
+          <input
+            type="range"
+            className="scrub"
+            aria-label="Playback position"
+            min={0}
+            max={playbackEndSec}
+            step={0.01}
+            value={Math.min(timeSec, playbackEndSec)}
+            disabled={!score}
+            onChange={handleSeek}
+          />
+        </div>
       </div>
-      <input
-        type="range"
-        aria-label="Playback position"
-        min={0}
-        max={playbackEndSec}
-        step={0.01}
-        value={timeSec}
-        disabled={!score}
-        onChange={handleSeek}
-      />
     </main>
   )
 }

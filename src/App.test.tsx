@@ -25,6 +25,7 @@ vi.stubGlobal('AudioContext', FakeAudioContext)
 
 afterEach(() => {
   noteStopFns.length = 0
+  localStorage.clear()
 })
 
 describe('App', () => {
@@ -157,5 +158,54 @@ describe('App', () => {
       expect(screen.getByRole('button', { name: /^play$/i })).toBeInTheDocument()
     })
     expect(stopFnsFromFirstFile.every((stop) => stop.mock.calls.length === 1)).toBe(true)
+  })
+
+  it('hiding a track while playing stops the old schedule and reschedules without that track', async () => {
+    render(<App />)
+    const buffer = readFileSync(resolve(__dirname, '../fixtures/multitrack.mid'))
+    const file = new File([buffer], 'multitrack.mid')
+
+    const fileInput = document.querySelector('input[type="file"]')!
+    fireEvent.change(fileInput, { target: { files: [file] } })
+
+    await waitFor(() => {
+      expect(screen.getByText(/staffA:/)).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /play/i }))
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /pause/i })).toBeInTheDocument()
+    })
+
+    const stopFnsBeforeToggle = [...noteStopFns]
+    const totalNotes = stopFnsBeforeToggle.length
+    expect(totalNotes).toBeGreaterThan(0)
+
+    fireEvent.click(screen.getByRole('checkbox', { name: /show track staffA:/i }))
+
+    expect(stopFnsBeforeToggle.every((stop) => stop.mock.calls.length === 1)).toBe(true)
+    const rescheduled = noteStopFns.filter((stop) => !stopFnsBeforeToggle.includes(stop))
+    // Only the remaining visible track's notes come back.
+    expect(rescheduled.length).toBeGreaterThan(0)
+    expect(rescheduled.length).toBeLessThan(totalNotes)
+    expect(rescheduled.every((stop) => stop.mock.calls.length === 0)).toBe(true)
+  })
+
+  it('persists config changes to localStorage and restores them on next mount', async () => {
+    const { unmount } = render(<App />)
+
+    const speed = screen.getByRole('slider', { name: /scroll speed/i })
+    fireEvent.change(speed, { target: { value: '300' } })
+
+    await waitFor(() => {
+      const stored = JSON.parse(localStorage.getItem('melograffer.vizConfig.v1') ?? '{}')
+      expect(stored.pxPerSec).toBe(300)
+    })
+
+    unmount()
+    render(<App />)
+    expect(
+      (screen.getByRole('slider', { name: /scroll speed/i }) as HTMLInputElement).value,
+    ).toBe('300')
   })
 })
