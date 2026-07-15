@@ -240,7 +240,12 @@ function App() {
   function handleCanvasPointerDown(e: React.PointerEvent<HTMLCanvasElement>) {
     if (!score) return
     const { x } = canvasPoint(e)
-    e.currentTarget.setPointerCapture?.(e.pointerId)
+    try {
+      // Keeps the drag alive when the cursor leaves the canvas mid-scrub.
+      e.currentTarget.setPointerCapture?.(e.pointerId)
+    } catch {
+      // Best-effort: synthetic events carry no active pointer id.
+    }
     canvasDragRef.current = {
       pointerId: e.pointerId,
       startXPx: x,
