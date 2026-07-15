@@ -29,18 +29,30 @@ interface DrawEntry {
 }
 
 interface StrokeEntry {
+  /** 'arc' = halo circle, 'line' = bar line or connecting line. */
+  kind: 'arc' | 'line'
   x: number
   y: number
   r: number
+  points: Array<{ x: number; y: number }>
   strokeStyle: string
   globalAlpha: number
   lineWidth: number
 }
 
+interface TextEntry {
+  text: string
+  x: number
+  y: number
+}
+
 function createMockCtx(width = 960, height = 360) {
   const draws: DrawEntry[] = []
   const strokes: StrokeEntry[] = []
+  const texts: TextEntry[] = []
   let lastArc = { x: 0, y: 0, r: 0 }
+  let pathKind: StrokeEntry['kind'] = 'arc'
+  let points: Array<{ x: number; y: number }> = []
 
   const ctx: CanvasLike2D = {
     canvas: { width, height },
@@ -48,9 +60,26 @@ function createMockCtx(width = 960, height = 360) {
     strokeStyle: '',
     lineWidth: 1,
     globalAlpha: 1,
+    font: '',
+    textAlign: 'left',
+    textBaseline: 'alphabetic',
     fillRect() {},
-    beginPath() {},
+    fillText(text, x, y) {
+      texts.push({ text, x, y })
+    },
+    beginPath() {
+      points = []
+    },
+    moveTo(x, y) {
+      pathKind = 'line'
+      points.push({ x, y })
+    },
+    lineTo(x, y) {
+      pathKind = 'line'
+      points.push({ x, y })
+    },
     arc(x, y, r) {
+      pathKind = 'arc'
       lastArc = { x, y, r }
     },
     fill() {
@@ -58,7 +87,9 @@ function createMockCtx(width = 960, height = 360) {
     },
     stroke() {
       strokes.push({
+        kind: pathKind,
         ...lastArc,
+        points: [...points],
         strokeStyle: ctx.strokeStyle as string,
         globalAlpha: ctx.globalAlpha,
         lineWidth: ctx.lineWidth,
@@ -66,7 +97,7 @@ function createMockCtx(width = 960, height = 360) {
     },
   }
 
-  return { ctx, draws, strokes }
+  return { ctx, draws, strokes, texts }
 }
 
 describe('drawFrame', () => {
@@ -117,9 +148,10 @@ describe('drawFrame', () => {
     const [activeDraw, inactiveDraw] = draws
     expect(activeDraw.globalAlpha).toBe(1)
     expect(inactiveDraw.globalAlpha).toBeLessThan(1)
-    expect(strokes).toHaveLength(1)
-    expect(strokes[0].x).toBeCloseTo(activeDraw.x)
-    expect(strokes[0].y).toBeCloseTo(activeDraw.y)
+    const halos = strokes.filter((s) => s.kind === 'arc')
+    expect(halos).toHaveLength(1)
+    expect(halos[0].x).toBeCloseTo(activeDraw.x)
+    expect(halos[0].y).toBeCloseTo(activeDraw.y)
   })
 
   it('draws the halo stroke before the dot fill for an active note', () => {
@@ -173,5 +205,82 @@ describe('drawFrame', () => {
     drawFrame(ctx, score, zoomedOutConfig, timeSec)
 
     expect(draws).toHaveLength(expectedCount)
+  })
+
+  it('draws one connecting line per consecutive note pair within a voice, under the dots', () => {
+    const score = scoreOf([
+      note({ startSec: 1, midiNote: 60 }),
+      note({ startSec: 2, midiNote: 64 }),
+      note({ startSec: 3, midiNote: 67 }),
+    ])
+    const { ctx, draws, strokes } = createMockCtx()
+    const order: string[] = []
+    const origFill = ctx.fill.bind(ctx)
+    const origStroke = ctx.stroke.bind(ctx)
+    ctx.fill = () => {
+      order.push('fill')
+      origFill()
+    }
+    ctx.stroke = () => {
+      origStroke()
+      order.push(`stroke:${strokes[strokes.length - 1].kind}`)
+    }
+    drawFrame(ctx, score, DEFAULT_VIZ_CONFIG, 2)
+
+    const lines = strokes.filter((s) => s.kind === 'line')
+    expect(lines).toHaveLength(2)
+    // Each line runs from one dot's center to the next dot's center.
+    expect(lines[0].points).toEqual([
+      { x: draws[0].x, y: draws[0].y },
+      { x: draws[1].x, y: draws[1].y },
+    ])
+    expect(lines[0].strokeStyle).toBe('#ff0000')
+    // All connecting lines are stroked before any dot is filled (halo arcs
+    // are interleaved with their own dots, so only line strokes must lead).
+    expect(order.lastIndexOf('stroke:line')).toBeLessThan(order.indexOf('fill'))
+  })
+
+  it('omits connecting lines when the toggle is off', () => {
+    const score = scoreOf([note({ startSec: 1 }), note({ startSec: 2 })])
+    const { ctx, strokes } = createMockCtx()
+    drawFrame(ctx, score, { ...DEFAULT_VIZ_CONFIG, showConnectingLines: false }, 1.5)
+
+    expect(strokes.filter((s) => s.kind === 'line')).toHaveLength(0)
+  })
+
+  it('skips connecting lines from hidden tracks', () => {
+    const score = scoreOf([note({ startSec: 1 }), note({ startSec: 2 })], { visible: false })
+    const { ctx, strokes } = createMockCtx()
+    drawFrame(ctx, score, DEFAULT_VIZ_CONFIG, 1.5)
+
+    expect(strokes).toHaveLength(0)
+  })
+
+  it('draws bar lines and numbers only for bars inside the visible window, honoring toggles', () => {
+    const score: Score = {
+      ...scoreOf([note({ startSec: 10 })]),
+      bars: [
+        { number: 1, startSec: 0 }, // far off-screen at timeSec=10
+        { number: 6, startSec: 10 },
+        { number: 7, startSec: 12 },
+        { number: 500, startSec: 1000 }, // far off-screen
+      ],
+    }
+
+    const { ctx, strokes, texts } = createMockCtx()
+    drawFrame(ctx, score, DEFAULT_VIZ_CONFIG, 10)
+
+    const barLines = strokes.filter((s) => s.kind === 'line')
+    expect(barLines).toHaveLength(2)
+    // Full-height verticals.
+    expect(barLines[0].points[0].x).toBeCloseTo(barLines[0].points[1].x)
+    expect(barLines[0].points[0].y).toBe(0)
+    expect(barLines[0].points[1].y).toBe(360)
+    expect(texts.map((t) => t.text)).toEqual(['6', '7'])
+
+    const { ctx: ctx2, strokes: strokes2, texts: texts2 } = createMockCtx()
+    drawFrame(ctx2, score, { ...DEFAULT_VIZ_CONFIG, showBarLines: false, showBarNumbers: false }, 10)
+    expect(strokes2.filter((s) => s.kind === 'line')).toHaveLength(0)
+    expect(texts2).toHaveLength(0)
   })
 })

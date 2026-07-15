@@ -31,4 +31,8 @@ export interface VizConfig {
   radiusMode: 'sqrt' | 'linear'
   /** Fraction of canvas width (0..1) where the fixed playhead sits. */
   playheadX: number
+  showBarLines: boolean
+  showBarNumbers: boolean
+  /** Lines connecting consecutive notes within a voice (MAM "part motion" look). */
+  showConnectingLines: boolean
 }

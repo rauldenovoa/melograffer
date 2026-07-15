@@ -6,4 +6,7 @@ export const DEFAULT_VIZ_CONFIG: VizConfig = {
   dotScale: 8,
   radiusMode: 'sqrt',
   playheadX: 1 / 3,
+  showBarLines: true,
+  showBarNumbers: true,
+  showConnectingLines: true,
 }
