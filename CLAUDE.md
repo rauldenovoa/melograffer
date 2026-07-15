@@ -23,6 +23,24 @@ Vite · React 18 · TypeScript strict · Canvas 2D · @tonejs/midi · WebCodecs 
 - Conventional commits; commit per milestone task.
 
 ## Current state
+- Milestone: 7 — website/app UI design revamp (see SPEC.md §6) — DONE (2026-07-15)
+- M7 done: app-chrome-only redesign (canvas rendering itself is M13, untouched).
+  Dark jewel-tone theme — accent colors (`--accent` #1c6baf, `--accent-green`
+  #006e48) sampled directly from `public/images/melograffer_logo_color.png`
+  pixels, not guessed. New `:root` token layer + self-hosted variable-woff2
+  `@font-face` (Fraunces display / Inter UI, vendored to `public/fonts/`, no
+  CDN) in `src/index.css`. `App.tsx` restructured into a product shell (app
+  bar with file actions, sidebar cards, canvas-frame with a real drag-drop
+  empty state reusing the existing MIDI-parse path, transport bar with a new
+  `formatTime` mm:ss readout) — all existing aria-labels/roles/button text
+  preserved, all 108 tests pass unchanged. `App.css` fully rewritten
+  (`.btn`/`.btn-primary`/`.btn-ghost`, themed native controls). Found and
+  fixed during verification: `<fieldset>`'s implicit `min-width: min-content`
+  (a UA-stylesheet default that ignores flex/grid ancestors) blew out the
+  sidebar and caused page-wide horizontal scroll on any long track name —
+  needs an explicit `min-width: 0` on the fieldset itself; the same fix is
+  also applied at the `.workspace` grid-item level since CSS Grid has the
+  identical default-min-width blowout risk independently of the fieldset one.
 - Milestone: 6 — MP4 export (see SPEC.md §6) — DONE (2026-07-15)
 - M6 done: `src/export/{frameTiming,renderAudio,exportMp4}.ts`. `frameTiming.ts`
   (pure, unit-tested) maps frame N → exactly `startSec + N/fps`. `renderAudio.ts`
@@ -87,7 +105,7 @@ Vite · React 18 · TypeScript strict · Canvas 2D · @tonejs/midi · WebCodecs 
   scheduler.ts's upfront full-piece scheduling is untested at SPEC §5's
   dense-orchestral scale; M6's bar-line/number text and line widths don't
   scale with export resolution the way dot radius does (cosmetic, not fixed).
-- Next: M7 (website/app UI design revamp) — see SPEC.md §6 for M7-M14, BACKLOG.md for unscheduled ("Later") work.
+- Next: M8 (housekeeping & quick UI wins) — see SPEC.md §6 for M8-M14, BACKLOG.md for unscheduled ("Later") work.
 <!-- Update this section at the end of every session; it replaces chat history. -->
 
 ## Rules
