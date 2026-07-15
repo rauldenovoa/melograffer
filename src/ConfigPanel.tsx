@@ -79,12 +79,12 @@ export function ConfigPanel({
           />
         </label>
         <label className="config-row">
-          <span>Dot scale ({config.dotScale})</span>
+          <span>Dot scale ({Math.round((config.dotScale / DEFAULT_VIZ_CONFIG.dotScale) * 100)}%)</span>
           <input
             type="range"
             aria-label="Dot scale"
-            min={1}
-            max={50}
+            min={30}
+            max={70}
             step={1}
             value={config.dotScale}
             onChange={(e) => set('dotScale', Number(e.target.value))}

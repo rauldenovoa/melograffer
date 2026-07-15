@@ -18,7 +18,7 @@ describe('loadVizConfig / saveVizConfig', () => {
     const config: VizConfig = {
       bg: '#ffffff',
       pxPerSec: 200,
-      dotScale: 4,
+      dotScale: 40,
       radiusMode: 'linear',
       playheadX: 0.5,
       showBarLines: false,

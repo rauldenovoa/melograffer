@@ -25,8 +25,11 @@ Vite · React 18 · TypeScript strict · Canvas 2D · @tonejs/midi · WebCodecs 
 ## Current state
 - Milestone: 5 — Config UI + external audio (see SPEC.md §6) — DONE
 - M5 polish round (user feedback, 2026-07-15): dotScale is now canvas-relative
-  (1/1000ths of canvas height per √sec; range 1–50, default 25; storage key
-  bumped to v2) so 1080p export scales dots for free; radius-mode selector
+  (1/1000ths of canvas height per √sec; storage key bumped to v2) so 1080p
+  export scales dots for free; range/default revised 2026-07-15 to 30–70,
+  default 50 (was too small at 1–50/25) — ConfigPanel shows this as a
+  default-relative percentage (60%–140%, `config.dotScale / DEFAULT.dotScale`)
+  rather than the raw unit, which is meaningless to a user; radius-mode selector
   hidden but dormant (`SHOW_RADIUS_MODE_SELECTOR` in ConfigPanel.tsx);
   lead-in/lead-out silence in bars (default 2 each, sized from the score's
   first/last measured bar; timeline starts at negative seconds; REPLACED the

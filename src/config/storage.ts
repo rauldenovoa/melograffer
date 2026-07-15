@@ -36,7 +36,7 @@ export function loadVizConfig(storage: StorageLike = localStorage): VizConfig {
   }
 
   config.pxPerSec = Math.max(config.pxPerSec, 1)
-  config.dotScale = Math.max(config.dotScale, 0.1)
+  config.dotScale = Math.min(Math.max(config.dotScale, 30), 70)
   config.playheadX = Math.min(Math.max(config.playheadX, 0), 1)
   config.leadInBars = Math.max(config.leadInBars, 0)
   config.leadOutBars = Math.max(config.leadOutBars, 0)
