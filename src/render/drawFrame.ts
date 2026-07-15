@@ -1,6 +1,7 @@
-import type { Score, VizConfig } from '../types'
+import type { Note, Score, VizConfig } from '../types'
 import {
   computePitchRange,
+  decayEnvelope,
   isNoteActive,
   isNoteInWindow,
   pitchToY,
@@ -10,8 +11,7 @@ import {
 } from './mapping'
 
 const INACTIVE_ALPHA = 0.65
-const HALO_ALPHA = 0.35
-const HALO_PADDING_PX = 4
+const RING_LINE_WIDTH = 2
 
 // Mid-gray stays legible over both dark and light configurable backgrounds.
 const BAR_LINE_COLOR = '#888888'
@@ -109,6 +109,12 @@ export function drawFrame(
     }
   }
 
+  // 0 for a finished note, 1 at onset, exponential in between.
+  const soundEnvelope = (note: Note) =>
+    decayEnvelope(
+      note.durationSec > 0 ? (timeSec - note.startSec) / note.durationSec : 1,
+    )
+
   for (const track of score.tracks) {
     if (!track.visible) continue
 
@@ -118,22 +124,46 @@ export function drawFrame(
       const x = xForNoteStart(note.startSec, timeSec, config, width)
       const y = pitchToY(note.midiNote, height, pitchRange)
       const radius = radiusForDuration(note.durationSec, config.dotScale, config.radiusMode, height)
-      const active = isNoteActive(note, timeSec)
 
-      // Halo is drawn before the dot so the dot's edge stays crisp on top of it.
-      if (active) {
-        ctx.globalAlpha = HALO_ALPHA
-        ctx.strokeStyle = track.color
-        ctx.lineWidth = 2
+      if (timeSec < note.startSec) {
+        // Not yet played: filled dot, slightly transparent.
+        ctx.globalAlpha = INACTIVE_ALPHA
+        ctx.fillStyle = track.color
         ctx.beginPath()
-        ctx.arc(x, y, radius + HALO_PADDING_PX, 0, TAU)
+        ctx.arc(x, y, radius, 0, TAU)
+        ctx.fill()
+      } else {
+        // From the instant a note sounds its fill goes transparent forever;
+        // the outline flashes fully opaque and decays back to the resting
+        // alpha across the note's own length. Past notes stay hollow rings.
+        ctx.globalAlpha = INACTIVE_ALPHA + (1 - INACTIVE_ALPHA) * soundEnvelope(note)
+        ctx.strokeStyle = track.color
+        ctx.lineWidth = RING_LINE_WIDTH
+        ctx.beginPath()
+        ctx.arc(x, y, radius, 0, TAU)
         ctx.stroke()
       }
+    }
+  }
 
-      ctx.globalAlpha = active ? 1 : INACTIVE_ALPHA
+  // Sounding-note clones ride the playhead on top of everything: opaque at
+  // onset, fading and shrinking to nothing by note end. No window culling —
+  // a long note whose start dot scrolled off is still sounding.
+  for (const track of score.tracks) {
+    if (!track.visible) continue
+
+    for (const note of track.notes) {
+      if (!isNoteActive(note, timeSec)) continue
+
+      const envelope = soundEnvelope(note)
+      const radius =
+        radiusForDuration(note.durationSec, config.dotScale, config.radiusMode, height) * envelope
+      if (radius <= 0) continue
+
+      ctx.globalAlpha = INACTIVE_ALPHA + (1 - INACTIVE_ALPHA) * envelope
       ctx.fillStyle = track.color
       ctx.beginPath()
-      ctx.arc(x, y, radius, 0, TAU)
+      ctx.arc(config.playheadX * width, pitchToY(note.midiNote, height, pitchRange), radius, 0, TAU)
       ctx.fill()
     }
   }

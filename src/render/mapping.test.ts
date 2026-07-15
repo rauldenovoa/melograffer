@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   barDurationsSec,
   computePitchRange,
+  decayEnvelope,
   findNoteAt,
   timeAtX,
   xForNoteStart,
@@ -106,6 +107,28 @@ describe('visibleTimeWindow / isNoteInWindow', () => {
     const justOutside = note({ startSec: window.endSec + 1 })
     expect(isNoteInWindow(justInside, window)).toBe(true)
     expect(isNoteInWindow(justOutside, window)).toBe(false)
+  })
+})
+
+describe('decayEnvelope', () => {
+  it('starts at 1, ends at exactly 0, and clamps outside [0,1]', () => {
+    expect(decayEnvelope(0)).toBe(1)
+    expect(decayEnvelope(1)).toBe(0)
+    expect(decayEnvelope(-0.5)).toBe(1)
+    expect(decayEnvelope(1.5)).toBe(0)
+  })
+
+  it('is monotonically decreasing', () => {
+    let prev = decayEnvelope(0)
+    for (let u = 0.1; u <= 1; u += 0.1) {
+      const v = decayEnvelope(u)
+      expect(v).toBeLessThan(prev)
+      prev = v
+    }
+  })
+
+  it('decays like a sound wave: most of the drop happens early', () => {
+    expect(decayEnvelope(0.25)).toBeLessThan(0.5)
   })
 })
 

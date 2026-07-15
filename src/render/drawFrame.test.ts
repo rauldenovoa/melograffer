@@ -107,7 +107,7 @@ describe('drawFrame', () => {
       note({ startSec: 5, durationSec: 1.0, midiNote: 60 }),
     ])
     const { ctx, draws } = createMockCtx()
-    drawFrame(ctx, score, DEFAULT_VIZ_CONFIG, 5)
+    drawFrame(ctx, score, DEFAULT_VIZ_CONFIG, 4.5)
 
     expect(draws).toHaveLength(2)
     const [quarter, half] = draws
@@ -120,7 +120,7 @@ describe('drawFrame', () => {
       note({ startSec: 2, midiNote: 74 }),
     ])
     const { ctx, draws } = createMockCtx()
-    drawFrame(ctx, score, DEFAULT_VIZ_CONFIG, 2)
+    drawFrame(ctx, score, DEFAULT_VIZ_CONFIG, 1.5)
 
     const [lowNoteDraw, highNoteDraw] = draws
     expect(highNoteDraw.y).toBeLessThan(lowNoteDraw.y)
@@ -137,27 +137,68 @@ describe('drawFrame', () => {
     expect(draws).toHaveLength(1)
   })
 
-  it('gives an active note full alpha plus a halo stroke, unlike an inactive note', () => {
-    const score = scoreOf([
-      note({ startSec: 10, durationSec: 1 }), // active at timeSec=10.5
-      note({ startSec: 12, durationSec: 1 }), // in the visible window, but not yet active
-    ])
-    const { ctx, draws, strokes } = createMockCtx()
-    drawFrame(ctx, score, DEFAULT_VIZ_CONFIG, 10.5)
+  it('note lifecycle: filled dot before, hollow ring + playhead clone while sounding, hollow ring after', () => {
+    const n = note({ startSec: 10, durationSec: 2, midiNote: 60 })
+    const score = scoreOf([n])
+    const playheadX = DEFAULT_VIZ_CONFIG.playheadX * 960
 
-    const [activeDraw, inactiveDraw] = draws
-    expect(activeDraw.globalAlpha).toBe(1)
-    expect(inactiveDraw.globalAlpha).toBeLessThan(1)
-    const halos = strokes.filter((s) => s.kind === 'arc')
-    expect(halos).toHaveLength(1)
-    expect(halos[0].x).toBeCloseTo(activeDraw.x)
-    expect(halos[0].y).toBeCloseTo(activeDraw.y)
+    // Before onset: one filled dot at resting alpha, no ring, no clone.
+    const before = createMockCtx()
+    drawFrame(before.ctx, score, DEFAULT_VIZ_CONFIG, 9)
+    expect(before.draws).toHaveLength(1)
+    expect(before.draws[0].globalAlpha).toBeCloseTo(0.65)
+    expect(before.strokes.filter((s) => s.kind === 'arc')).toHaveLength(0)
+
+    // At onset: the dot's fill is gone; a fully opaque ring at the dot, and a
+    // fully opaque clone at the playhead with the dot's full radius.
+    const onset = createMockCtx()
+    drawFrame(onset.ctx, score, DEFAULT_VIZ_CONFIG, 10)
+    const onsetRings = onset.strokes.filter((s) => s.kind === 'arc')
+    expect(onsetRings).toHaveLength(1)
+    expect(onsetRings[0].globalAlpha).toBeCloseTo(1)
+    expect(onset.draws).toHaveLength(1) // only the clone fills
+    expect(onset.draws[0].x).toBeCloseTo(playheadX)
+    expect(onset.draws[0].globalAlpha).toBeCloseTo(1)
+    expect(onset.draws[0].r).toBeCloseTo(onsetRings[0].r)
+
+    // Mid-note: ring alpha decaying between 1 and resting; clone shrunk.
+    const mid = createMockCtx()
+    drawFrame(mid.ctx, score, DEFAULT_VIZ_CONFIG, 11)
+    const midRings = mid.strokes.filter((s) => s.kind === 'arc')
+    expect(midRings[0].globalAlpha).toBeGreaterThan(0.65)
+    expect(midRings[0].globalAlpha).toBeLessThan(1)
+    expect(mid.draws).toHaveLength(1)
+    expect(mid.draws[0].r).toBeLessThan(onset.draws[0].r)
+    expect(mid.draws[0].x).toBeCloseTo(playheadX) // clone stays at the playhead
+
+    // After the note ends: hollow ring at resting alpha, no fill, no clone.
+    const after = createMockCtx()
+    drawFrame(after.ctx, score, DEFAULT_VIZ_CONFIG, 13)
+    const afterRings = after.strokes.filter((s) => s.kind === 'arc')
+    expect(afterRings).toHaveLength(1)
+    expect(afterRings[0].globalAlpha).toBeCloseTo(0.65)
+    expect(after.draws).toHaveLength(0)
   })
 
-  it('draws the halo stroke before the dot fill for an active note', () => {
-    const score = scoreOf([note({ startSec: 1, durationSec: 1 })])
+  it('still draws the playhead clone for a long note whose start dot scrolled off-screen', () => {
+    // At 120 px/s the playhead is 320px from the left edge: a note that
+    // started >3s ago is culled from the dot pass, but if it is still
+    // sounding its clone must ride the playhead.
+    const score = scoreOf([note({ startSec: 0, durationSec: 60, midiNote: 60 })])
+    const { ctx, draws } = createMockCtx()
+    drawFrame(ctx, score, DEFAULT_VIZ_CONFIG, 30)
+
+    expect(draws).toHaveLength(1)
+    expect(draws[0].x).toBeCloseTo(DEFAULT_VIZ_CONFIG.playheadX * 960)
+  })
+
+  it('draws sounding clones on top: the clone fill comes after every dot-pass call', () => {
+    const score = scoreOf([
+      note({ startSec: 10, durationSec: 2 }), // sounding at t=10.5
+      note({ startSec: 11, durationSec: 1 }), // future filled dot
+    ])
     const calls: string[] = []
-    const { ctx } = createMockCtx()
+    const { ctx, draws } = createMockCtx()
     const origFill = ctx.fill.bind(ctx)
     const origStroke = ctx.stroke.bind(ctx)
     ctx.fill = () => {
@@ -168,8 +209,10 @@ describe('drawFrame', () => {
       calls.push('stroke')
       origStroke()
     }
-    drawFrame(ctx, score, DEFAULT_VIZ_CONFIG, 1.5)
-    expect(calls).toEqual(['stroke', 'fill'])
+    drawFrame(ctx, score, DEFAULT_VIZ_CONFIG, 10.5)
+
+    expect(calls[calls.length - 1]).toBe('fill')
+    expect(draws[draws.length - 1].x).toBeCloseTo(DEFAULT_VIZ_CONFIG.playheadX * 960)
   })
 
   it('renders real parsed MIDI data without throwing', () => {
@@ -194,7 +237,9 @@ describe('drawFrame', () => {
 
     const zoomedOutConfig = { ...DEFAULT_VIZ_CONFIG, pxPerSec: 5 }
     const canvasWidth = 960
-    const timeSec = 300
+    // Negative time keeps every windowed note in the future (filled dots), so
+    // the fill count is exactly the windowed-note count.
+    const timeSec = -80
 
     const window = visibleTimeWindow(timeSec, zoomedOutConfig, canvasWidth)
     const expectedCount = notes.filter((n) => isNoteInWindow(n, window)).length
@@ -225,7 +270,7 @@ describe('drawFrame', () => {
       origStroke()
       order.push(`stroke:${strokes[strokes.length - 1].kind}`)
     }
-    drawFrame(ctx, score, DEFAULT_VIZ_CONFIG, 2)
+    drawFrame(ctx, score, DEFAULT_VIZ_CONFIG, 0.5)
 
     const lines = strokes.filter((s) => s.kind === 'line')
     expect(lines).toHaveLength(2)

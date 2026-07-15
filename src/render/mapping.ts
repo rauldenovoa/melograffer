@@ -126,6 +126,24 @@ export function findNoteAt(
   return best
 }
 
+/**
+ * Higher = steeper early drop. 5 ≈ a struck-string feel: half gone in the
+ * first ~15% of the note.
+ */
+const DECAY_RATE = 5
+
+/**
+ * Exponential decay from 1 (note onset) to exactly 0 (note end), like a real
+ * sound wave's amplitude envelope — normalized so it reaches 0 at progress 1
+ * instead of approaching it asymptotically.
+ */
+export function decayEnvelope(progress: number): number {
+  if (progress <= 0) return 1
+  if (progress >= 1) return 0
+  const floor = Math.exp(-DECAY_RATE)
+  return (Math.exp(-DECAY_RATE * progress) - floor) / (1 - floor)
+}
+
 export function isNoteActive(note: Note, timeSec: number): boolean {
   return timeSec >= note.startSec && timeSec < note.startSec + note.durationSec
 }
