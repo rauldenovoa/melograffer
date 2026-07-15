@@ -1,4 +1,4 @@
-import { Soundfont2 } from 'smplr'
+import { Scheduler, Soundfont2 } from 'smplr'
 import { GeneratorType, SoundFont2 } from 'soundfont2'
 
 const SOUNDFONT_URL = '/soundfonts/ChaosBank.sf2'
@@ -117,6 +117,14 @@ export async function loadInstrument(ctx: BaseAudioContext): Promise<Instrument>
   const sampler = Soundfont2(ctx, {
     url: SOUNDFONT_URL,
     createSoundfont: (data) => applyZoneGenerators(new SoundFont2(data)),
+    // smplr's default Scheduler dispatches any note more than ~200ms ahead of
+    // currentTime via a real setInterval; that timer never fires during an
+    // OfflineAudioContext's faster-than-realtime render (M6 export), so every
+    // note beyond that window would silently never sound. An infinite
+    // lookahead forces every note to dispatch synchronously instead, which is
+    // exactly what offline rendering needs (the whole piece is scheduled
+    // upfront, at currentTime 0, before startRendering() runs).
+    ...(ctx instanceof OfflineAudioContext ? { scheduler: Scheduler(ctx, { lookaheadMs: Infinity }) } : {}),
   })
   await sampler.ready
 
