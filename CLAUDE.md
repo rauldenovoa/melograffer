@@ -37,11 +37,24 @@ Vite · React 18 · TypeScript strict · Canvas 2D · @tonejs/midi · WebCodecs 
   `mp4-muxer` (new dep — SPEC §3/§4 mandate it; WebCodecs itself is a native
   browser API). WebCodecs-only: throws `UnsupportedBrowserError` on unsupported
   browsers rather than falling back to MediaRecorder/WebM (that fallback is
-  now To Do #19 (Later)). `VizConfig.exportAspect` ('landscape'/'portrait',
+  now BACKLOG.md #19 (Later)). `VizConfig.exportAspect` ('landscape'/'portrait',
   persisted) picks 1920×1080 vs 1080×1920 (`EXPORT_RESOLUTIONS`). ConfigPanel's
   new "Export" fieldset has the aspect selector, an Export MP4 button, and a
   progress readout; App.tsx's `handleExport` reuses the same lazy
   instrument-load path as Play, then triggers a same-tab download.
+- M6 bug-fix round (2026-07-15, user testing): synth-only exports were
+  totally silent — smplr's default Scheduler defers any note >~200ms ahead of
+  `currentTime` to a real `setInterval`, which never fires during an
+  `OfflineAudioContext` render; fixed by passing `scheduler: Scheduler(ctx,
+  { lookaheadMs: Infinity })` to `Soundfont2` when `ctx instanceof
+  OfflineAudioContext` (instrument.ts) so every note dispatches synchronously.
+  Also: `isNoteInWindow` (mapping.ts) now takes the note's own radius so large
+  dots scroll in instead of popping in at the edge; `EXPORT_RESOLUTIONS` uses
+  1088 (not 1080) on the non-16:9-exact side — mod-16 dims need no H.264 crop
+  metadata, which one real-world re-encode (iMessage/iCloud sync) appeared to
+  mishandle, corrupting the padded edge; `handleExport` scales `pxPerSec` by
+  the export/preview width ratio so exported scroll speed visually matches
+  the preview; downloaded filename suffixes `_landscape`/`_portrait`.
 - M5 done (2026-07-15): config sidebar (`ConfigPanel.tsx`, persisted via
   `config/storage.ts`) for track show/hide+color, bg, speed, canvas-relative
   dot scale, playhead, bar-lines/numbers/connecting-lines; lead-in/lead-out
@@ -51,8 +64,8 @@ Vite · React 18 · TypeScript strict · Canvas 2D · @tonejs/midi · WebCodecs 
   mapping.ts); spacebar play/pause; sounding-note animation (hollow rings +
   decaying outline + playhead clone, `decayEnvelope` in mapping.ts); global
   instrument selector (`loadInstrument` exposes `instrumentNames`/
-  `setInstrument`). Per-track GM instruments remain To Do #5 (Next) — SPEC.md
-  has the concrete bypass plan (`sf2.presets` bank/program + smplr's
+  `setInstrument`). Per-track GM instruments remain BACKLOG.md #5 (Next) —
+  it has the concrete bypass plan (`sf2.presets` bank/program + smplr's
   `sf2InstrumentToPreset`).
 - M4 done: `src/audio/{clock,instrument,scheduler}.ts` + Play/Pause/seek
   (rAF-driven, clock = `AudioContext.currentTime`, never Date.now). SoundFont
@@ -70,12 +83,12 @@ Vite · React 18 · TypeScript strict · Canvas 2D · @tonejs/midi · WebCodecs 
   scheduler.ts's upfront full-piece scheduling is untested at SPEC §5's
   dense-orchestral scale; M6's bar-line/number text and line widths don't
   scale with export resolution the way dot radius does (cosmetic, not fixed).
-- Next: nothing assigned — see SPEC.md "To Do" for unscheduled work.
+- Next: nothing assigned — see BACKLOG.md for unscheduled work.
 <!-- Update this section at the end of every session; it replaces chat history. -->
 
 ## Rules
 - Read SPEC.md before non-trivial changes. Do not restate it; reference sections.
 - No new dependencies without stating why in the commit message.
 - If stuck after 2 attempts, stop and summarize the problem instead of thrashing.
-- Do not pre-build "To Do — Later" features (MusicXML, DTW alignment, OMR).
+- Do not pre-build BACKLOG.md "Later" features (MusicXML, DTW alignment, OMR).
 - After a plan is approved (plan mode), copy it into `plans/milestone-N-<slug>.md` before implementing.
