@@ -11,4 +11,5 @@ export const DEFAULT_VIZ_CONFIG: VizConfig = {
   showConnectingLines: true,
   leadInBars: 2,
   leadOutBars: 2,
+  instrumentName: '',
 }

@@ -39,7 +39,13 @@ Vite · React 18 · TypeScript strict · Canvas 2D · @tonejs/midi · WebCodecs 
   and decays exponentially (`decayEnvelope`, k=5, normalized to hit resting
   alpha exactly at note end), plus a borderless clone riding the playhead
   that shrinks/fades to nothing by note end (clone pass skips window culling
-  so long notes with off-screen starts still animate).
+  so long notes with off-screen starts still animate). Global instrument
+  selector added post-M5 (2026-07-15): `loadInstrument` (instrument.ts) now
+  also returns `instrumentNames`/`defaultInstrumentName`/`setInstrument`;
+  ConfigPanel shows a dropdown once Play has loaded the sampler; choice
+  persists as `VizConfig.instrumentName`. Per-track GM instruments remain
+  Out (later) — SPEC.md now has the concrete bypass plan (sf2.presets
+  bank/program + smplr's `sf2InstrumentToPreset`).
 - M5 done: `Score.bars` (measure starts from the time-signature map,
   4/4 fallback, computed in `parseMidi`); `drawFrame` draws bar lines +
   numbers and per-voice connecting lines behind the dots (3 new VizConfig

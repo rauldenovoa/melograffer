@@ -4,7 +4,11 @@ import { resolve } from 'node:path'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import App from './App'
 
-const { noteStopFns } = vi.hoisted(() => ({ noteStopFns: [] as Array<ReturnType<typeof vi.fn>> }))
+const { noteStopFns, setInstrumentMock, MOCK_INSTRUMENT_NAMES } = vi.hoisted(() => ({
+  noteStopFns: [] as Array<ReturnType<typeof vi.fn>>,
+  setInstrumentMock: vi.fn().mockResolvedValue(undefined),
+  MOCK_INSTRUMENT_NAMES: ['Square Wave', 'Acoustic Grand Piano', 'Trumpet Section'],
+}))
 
 vi.mock('./audio/instrument', () => ({
   loadInstrument: vi.fn().mockResolvedValue({
@@ -13,6 +17,9 @@ vi.mock('./audio/instrument', () => ({
       noteStopFns.push(stop)
       return stop
     }),
+    instrumentNames: MOCK_INSTRUMENT_NAMES,
+    defaultInstrumentName: 'Acoustic Grand Piano',
+    setInstrument: setInstrumentMock,
   }),
 }))
 
@@ -49,6 +56,7 @@ vi.stubGlobal('AudioContext', FakeAudioContext)
 afterEach(() => {
   noteStopFns.length = 0
   bufferSources.length = 0
+  setInstrumentMock.mockClear()
   localStorage.clear()
 })
 
@@ -401,5 +409,78 @@ describe('App', () => {
     expect(
       (screen.getByRole('slider', { name: /scroll speed/i }) as HTMLInputElement).value,
     ).toBe('300')
+  })
+
+  it('shows an instrument dropdown of the soundfont\'s names once Play has loaded it', async () => {
+    render(<App />)
+    const buffer = readFileSync(resolve(__dirname, '../fixtures/multitrack.mid'))
+    fireEvent.change(document.querySelector('input[type="file"]')!, {
+      target: { files: [new File([buffer], 'multitrack.mid')] },
+    })
+    await waitFor(() => {
+      expect(screen.getByText(/staffA:/)).toBeInTheDocument()
+    })
+
+    expect(screen.queryByRole('combobox', { name: /instrument/i })).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /play/i }))
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /pause/i })).toBeInTheDocument()
+    })
+
+    const select = screen.getByRole('combobox', { name: /instrument/i }) as HTMLSelectElement
+    expect([...select.options].map((o) => o.value)).toEqual(MOCK_INSTRUMENT_NAMES)
+    expect(select.value).toBe('Acoustic Grand Piano')
+  })
+
+  it('selecting a new instrument switches the synth and persists the choice', async () => {
+    render(<App />)
+    const buffer = readFileSync(resolve(__dirname, '../fixtures/multitrack.mid'))
+    fireEvent.change(document.querySelector('input[type="file"]')!, {
+      target: { files: [new File([buffer], 'multitrack.mid')] },
+    })
+    await waitFor(() => {
+      expect(screen.getByText(/staffA:/)).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /play/i }))
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /pause/i })).toBeInTheDocument()
+    })
+
+    const select = screen.getByRole('combobox', { name: /instrument/i })
+    fireEvent.change(select, { target: { value: 'Trumpet Section' } })
+
+    expect(setInstrumentMock).toHaveBeenCalledWith('Trumpet Section')
+    await waitFor(() => {
+      const stored = JSON.parse(localStorage.getItem('melograffer.vizConfig.v2') ?? '{}')
+      expect(stored.instrumentName).toBe('Trumpet Section')
+    })
+  })
+
+  it('applies a persisted instrument preference before the first note plays', async () => {
+    localStorage.setItem(
+      'melograffer.vizConfig.v2',
+      JSON.stringify({ instrumentName: 'Trumpet Section' }),
+    )
+
+    render(<App />)
+    const buffer = readFileSync(resolve(__dirname, '../fixtures/multitrack.mid'))
+    fireEvent.change(document.querySelector('input[type="file"]')!, {
+      target: { files: [new File([buffer], 'multitrack.mid')] },
+    })
+    await waitFor(() => {
+      expect(screen.getByText(/staffA:/)).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /play/i }))
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /pause/i })).toBeInTheDocument()
+    })
+
+    expect(setInstrumentMock).toHaveBeenCalledWith('Trumpet Section')
+    expect(
+      (screen.getByRole('combobox', { name: /instrument/i }) as HTMLSelectElement).value,
+    ).toBe('Trumpet Section')
   })
 })

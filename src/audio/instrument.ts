@@ -97,6 +97,12 @@ export interface Instrument {
    * later stop from us a silent no-op. Callers own ending the note.
    */
   start(opts: { note: number; velocity: number; time: number }): () => void
+  /** Every instrument name in the loaded soundfont, for a selector UI. */
+  instrumentNames: string[]
+  /** The name PREFERRED_INSTRUMENT_PATTERN resolved to at load time. */
+  defaultInstrumentName: string
+  /** Switches which instrument `start` plays; takes effect on future notes. */
+  setInstrument(name: string): Promise<void>
 }
 
 export async function loadInstrument(ctx: BaseAudioContext): Promise<Instrument> {
@@ -106,10 +112,10 @@ export async function loadInstrument(ctx: BaseAudioContext): Promise<Instrument>
   })
   await sampler.ready
 
-  const instrumentName =
+  const defaultInstrumentName =
     sampler.instrumentNames.find((name) => PREFERRED_INSTRUMENT_PATTERN.test(name)) ?? sampler.instrumentNames[0]
-  if (instrumentName) {
-    await sampler.loadInstrument(instrumentName)
+  if (defaultInstrumentName) {
+    await sampler.loadInstrument(defaultInstrumentName)
   }
 
   let nextStopId = 0
@@ -122,5 +128,8 @@ export async function loadInstrument(ctx: BaseAudioContext): Promise<Instrument>
       // each returned stop function scoped to only the voice it started.
       return sampler.start({ ...opts, stopId: nextStopId++ })
     },
+    instrumentNames: sampler.instrumentNames,
+    defaultInstrumentName: defaultInstrumentName ?? '',
+    setInstrument: (name) => sampler.loadInstrument(name),
   }
 }

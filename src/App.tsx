@@ -30,6 +30,8 @@ function App() {
   const [isLoadingAudio, setIsLoadingAudio] = useState(false)
   const [externalAudioName, setExternalAudioName] = useState<string | null>(null)
   const [offsetMs, setOffsetMs] = useState(0)
+  const [instrumentNames, setInstrumentNames] = useState<string[]>([])
+  const [selectedInstrument, setSelectedInstrument] = useState('')
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   const audioCtxRef = useRef<AudioContext | null>(null)
@@ -162,8 +164,19 @@ function App() {
 
     if (!externalPlayerRef.current && !instrumentRef.current) {
       setIsLoadingAudio(true)
-      instrumentRef.current = await loadInstrument(ctx)
+      const instrument = await loadInstrument(ctx)
+      instrumentRef.current = instrument
       setIsLoadingAudio(false)
+
+      setInstrumentNames(instrument.instrumentNames)
+      const initialName =
+        config.instrumentName && instrument.instrumentNames.includes(config.instrumentName)
+          ? config.instrumentName
+          : instrument.defaultInstrumentName
+      if (initialName !== instrument.defaultInstrumentName) {
+        await instrument.setInstrument(initialName)
+      }
+      setSelectedInstrument(initialName)
     }
 
     // Playing from the very end restarts from the top (lead-in included).
@@ -218,6 +231,21 @@ function App() {
     ) {
       stopSound()
       startSoundAt(clock.getCurrentTimeSec(), next, offsetMs)
+    }
+  }
+
+  async function handleInstrumentChange(name: string) {
+    setSelectedInstrument(name)
+    setConfig({ ...config, instrumentName: name })
+    await instrumentRef.current?.setInstrument(name)
+
+    // Mirrors handleTrackChange: scheduleScore fixes each note's instrument
+    // at scheduling time, so an in-progress synth playback needs a reschedule
+    // for the switch to be audible before the next Play.
+    const clock = clockRef.current
+    if (isPlaying && clock && score && !externalPlayerRef.current) {
+      stopSound()
+      startSoundAt(clock.getCurrentTimeSec(), score, offsetMs)
     }
   }
 
@@ -353,6 +381,9 @@ function App() {
           onConfigChange={setConfig}
           score={score}
           onTrackChange={handleTrackChange}
+          instrumentNames={instrumentNames}
+          selectedInstrument={selectedInstrument}
+          onInstrumentChange={handleInstrumentChange}
         />
         <div className="stage">
           <p>Drop a MIDI file to see its tracks.</p>

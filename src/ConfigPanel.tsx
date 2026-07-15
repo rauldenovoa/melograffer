@@ -13,9 +13,20 @@ interface ConfigPanelProps {
   onConfigChange: (next: VizConfig) => void
   score: Score | null
   onTrackChange: (trackId: string, patch: TrackPatch) => void
+  instrumentNames: string[]
+  selectedInstrument: string
+  onInstrumentChange: (name: string) => void
 }
 
-export function ConfigPanel({ config, onConfigChange, score, onTrackChange }: ConfigPanelProps) {
+export function ConfigPanel({
+  config,
+  onConfigChange,
+  score,
+  onTrackChange,
+  instrumentNames,
+  selectedInstrument,
+  onInstrumentChange,
+}: ConfigPanelProps) {
   const set = <K extends keyof VizConfig>(key: K, value: VizConfig[K]) =>
     onConfigChange({ ...config, [key]: value })
 
@@ -132,6 +143,26 @@ export function ConfigPanel({ config, onConfigChange, score, onTrackChange }: Co
           Reset to defaults
         </button>
       </fieldset>
+
+      {instrumentNames.length > 0 && (
+        <fieldset>
+          <legend>Sound</legend>
+          <label className="config-row">
+            <span>Instrument</span>
+            <select
+              aria-label="Instrument"
+              value={selectedInstrument}
+              onChange={(e) => onInstrumentChange(e.target.value)}
+            >
+              {instrumentNames.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </label>
+        </fieldset>
+      )}
 
       <fieldset>
         <legend>Timing</legend>

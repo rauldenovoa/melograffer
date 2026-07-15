@@ -26,6 +26,7 @@ describe('loadVizConfig / saveVizConfig', () => {
       showConnectingLines: false,
       leadInBars: 4,
       leadOutBars: 0,
+      instrumentName: 'Trumpet Section',
     }
     saveVizConfig(config)
     expect(loadVizConfig()).toEqual(config)

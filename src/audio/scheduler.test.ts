@@ -4,7 +4,12 @@ import { scheduleScore, stopAll } from './scheduler'
 import type { Instrument } from './instrument'
 
 function fakeInstrument(): Instrument & { start: ReturnType<typeof vi.fn> } {
-  return { start: vi.fn(() => vi.fn()) }
+  return {
+    start: vi.fn(() => vi.fn()),
+    instrumentNames: [],
+    defaultInstrumentName: '',
+    setInstrument: vi.fn().mockResolvedValue(undefined),
+  }
 }
 
 function score(overrides: Partial<Score['tracks'][number]> = {}): Score {
@@ -76,7 +81,7 @@ describe('scheduleScore', () => {
 
   it('stops each note itself once its own duration elapses, without a second call from us', () => {
     const stopVoice = vi.fn()
-    const instrument: Instrument = { start: vi.fn(() => stopVoice) }
+    const instrument: Instrument = { ...fakeInstrument(), start: vi.fn(() => stopVoice) }
     // A single note lasting 1s, starting immediately (fromSec === note.startSec).
     scheduleScore(instrument, score({ notes: [{ startSec: 0, durationSec: 1, midiNote: 60, velocity: 1 }] }), 0, 100)
 
@@ -89,7 +94,7 @@ describe('scheduleScore', () => {
 
   it('cancelling before the natural end stops the voice immediately and never fires the natural-end timer', () => {
     const stopVoice = vi.fn()
-    const instrument: Instrument = { start: vi.fn(() => stopVoice) }
+    const instrument: Instrument = { ...fakeInstrument(), start: vi.fn(() => stopVoice) }
     const cancelFns = scheduleScore(
       instrument,
       score({ notes: [{ startSec: 0, durationSec: 5, midiNote: 60, velocity: 1 }] }),

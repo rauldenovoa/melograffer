@@ -39,4 +39,6 @@ export interface VizConfig {
   leadInBars: number
   /** Silent bars after the last note before playback stops. */
   leadOutBars: number
+  /** Persisted instrument choice; '' means "use the synth's built-in default". */
+  instrumentName: string
 }
