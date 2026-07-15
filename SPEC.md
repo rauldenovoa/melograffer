@@ -12,20 +12,24 @@ A client-only web app that turns a MIDI score into a smalin-style scrolling musi
 ## 3. Scope
 **In (MVP):**
 - MIDI (.mid) parsing → note events per track: {startSec, durationSec, midiNote, velocity, trackId}
-- Canvas 2D scrolling renderer: fixed playhead (center or ~1/3 from left), notes scroll right→left; y = MIDI note number (log-frequency, like a staff); dot radius = k·√duration by default (option: linear, capped); active notes highlighted (brighter/halo)
-- Track selection (include/exclude), per-track color, background color, scroll speed (px/sec), dot-size scale — all in a config sidebar, persisted in URL params or localStorage
+- Canvas 2D scrolling renderer: playhead position configurable (default ~1/3 from left); notes scroll right→left; y = MIDI note number (log-frequency, like a staff); dot radius = k·√duration by default (option: linear, capped); active notes highlighted (brighter/halo); optional lines connecting consecutive notes within a voice; optional bar (measure) lines and bar-number labels
+- Track selection (include/exclude), per-track color, background color, scroll speed (px/sec), dot-size scale, playhead position, bar-marks/bar-numbers visibility — all in a config sidebar, persisted in URL params or localStorage
 - Audio A: built-in SoundFont synthesis of the MIDI (play/pause/seek)
 - Audio B: user-supplied audio file with a manual offset slider (±ms) for fine alignment
 - MP4 export: offline frame-by-frame render via WebCodecs → mux with `mp4-muxer`; audio track from OfflineAudioContext render (Audio A) or the uploaded file (Audio B). Deterministic: frame N drawn at exactly N/fps seconds — never screen capture.
-- 1080p/60fps export target; canvas preview can be lower res
+- 1080p/60fps export target (canvas preview can be lower res); output aspect-ratio presets for common platforms (e.g. YouTube 16:9 landscape, Instagram 9:16 portrait for Reels/Stories/feed)
 
 **Out (later):**
 - MusicXML input (easy add; do after MVP proves the pipeline)
 - Real-recording alignment: separate offline Python tool (synctoolbox/librosa DTW → tempo map → warped MIDI that this app consumes unchanged). Do NOT build into the web app.
 - PDF/scanned score input (OMR — Audiveris or similar; unreliable, evaluate later)
-- Bar/ribbon note shapes as alternative to dots; connecting lines between consecutive notes of a voice
+- Bar/ribbon note shapes as alternative to dots
 - Presets/themes, piece library
 - Swappable/multiple soundfont support (M4 bundled `ChaosBank.sf2` for its CC0 license; a future milestone could let a different `.sf2` be swapped in/tested without re-litigating that choice)
+- Modular visualization styles ("renderers"): support multiple pluggable viz styles beyond the current BALLS-style dots, each with its own shape/motion/color-preset behavior, user-selectable — as in Malinowski's MAM "Renderers" (musanim.com/Renderers/)
+- Harmonic coloring option (musanim.com/HarmonicColoring/)
+- "Organic" scroll: nonlinear (e.g. logarithmic) time-axis warp that eases around the currently-sounding note instead of constant-speed scroll
+- SF2 volume envelope (ADSR): smplr ignores it, so notes cut off abruptly at release instead of decaying naturally — audio-quality polish, not urgent
 
 **Never:**
 - No auth, no database, no server-side rendering, no Supabase. Static site only.
@@ -60,8 +64,8 @@ A client-only web app that turns a MIDI score into a smalin-style scrolling musi
 | 2 | MIDI ingest + data model | Drop .mid → track list with names/note counts rendered; unit tests on 2 sample MIDIs | opusplan |
 | 3 | Canvas renderer (static + scrub) | `drawFrame` pure fn; time slider scrubs the score; pitch/duration/color mapping correct; 60fps with 5k+ notes | opusplan |
 | 4 | Audio playback + live sync | Play/pause/seek with SoundFont synth; drift < 1 frame over 3 min (clock = AudioContext.currentTime) | opusplan |
-| 5 | Config UI + external audio | Track toggles, colors, bg, speed, dot scale; audio file upload + offset slider; settings persist | opusplan |
-| 6 | MP4 export | Downloadable 1080p60 H.264+AAC MP4; A/V sync verified vs. live playback | opusplan |
+| 5 | Config UI + external audio | Track toggles, colors, bg, speed, dot scale, playhead position; bar-marks/bar-number toggle; connecting lines between consecutive notes; audio file upload + offset slider; settings persist | opusplan |
+| 6 | MP4 export | Downloadable 1080p60 H.264+AAC MP4 with social-platform output presets (YouTube 16:9, Instagram portrait 9:16); A/V sync verified vs. live playback | opusplan |
 | — | Bulk/mechanical passes (lint, renames) | — | haiku |
 | — | Escalation: stuck >2 attempts, root-cause unclear (likely M4 clock or M6 muxing) | — | fable |
 
