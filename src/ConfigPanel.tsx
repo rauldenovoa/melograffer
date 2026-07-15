@@ -16,6 +16,10 @@ interface ConfigPanelProps {
   instrumentNames: string[]
   selectedInstrument: string
   onInstrumentChange: (name: string) => void
+  onExport: () => void
+  isExporting: boolean
+  exportProgress: number
+  exportError: string | null
 }
 
 export function ConfigPanel({
@@ -26,6 +30,10 @@ export function ConfigPanel({
   instrumentNames,
   selectedInstrument,
   onInstrumentChange,
+  onExport,
+  isExporting,
+  exportProgress,
+  exportError,
 }: ConfigPanelProps) {
   const set = <K extends keyof VizConfig>(key: K, value: VizConfig[K]) =>
     onConfigChange({ ...config, [key]: value })
@@ -194,6 +202,25 @@ export function ConfigPanel({
             }}
           />
         </label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Export</legend>
+        <label className="config-row">
+          <span>Aspect ratio</span>
+          <select
+            aria-label="Export aspect ratio"
+            value={config.exportAspect}
+            onChange={(e) => set('exportAspect', e.target.value as VizConfig['exportAspect'])}
+          >
+            <option value="landscape">Landscape 16:9 (YouTube)</option>
+            <option value="portrait">Portrait 9:16 (Reels/Stories)</option>
+          </select>
+        </label>
+        <button type="button" onClick={onExport} disabled={!score || isExporting}>
+          {isExporting ? `Exporting… ${Math.round(exportProgress * 100)}%` : 'Export MP4'}
+        </button>
+        {exportError && <p className="export-error">{exportError}</p>}
       </fieldset>
     </aside>
   )

@@ -9,6 +9,8 @@ import { scheduleScore, stopAll } from './audio/scheduler'
 import { ExternalAudioPlayer } from './audio/externalAudio'
 import { loadVizConfig, saveVizConfig } from './config/storage'
 import { ConfigPanel, type TrackPatch } from './ConfigPanel'
+import { renderAudioTrack } from './export/renderAudio'
+import { EXPORT_RESOLUTIONS, exportMp4 } from './export/exportMp4'
 import type { Score } from './types'
 
 const CANVAS_WIDTH = 960
@@ -33,6 +35,9 @@ function App() {
   const [instrumentNames, setInstrumentNames] = useState<string[]>([])
   const [selectedInstrument, setSelectedInstrument] = useState('')
   const [midiFileName, setMidiFileName] = useState<string | null>(null)
+  const [isExporting, setIsExporting] = useState(false)
+  const [exportProgress, setExportProgress] = useState(0)
+  const [exportError, setExportError] = useState<string | null>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const midiFileInputRef = useRef<HTMLInputElement>(null)
 
@@ -40,6 +45,7 @@ function App() {
   const clockRef = useRef<PlaybackClock | null>(null)
   const instrumentRef = useRef<Instrument | null>(null)
   const externalPlayerRef = useRef<ExternalAudioPlayer | null>(null)
+  const externalAudioBufferRef = useRef<AudioBuffer | null>(null)
   const activeStopFnsRef = useRef<Array<() => void>>([])
   const rafRef = useRef<number | null>(null)
   const pendingSoundTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -326,14 +332,84 @@ function App() {
     const ctx = ensureAudioContext()
     const buffer = await ctx.decodeAudioData(await file.arrayBuffer())
     externalPlayerRef.current = new ExternalAudioPlayer(ctx, buffer)
+    externalAudioBufferRef.current = buffer
     setExternalAudioName(file.name)
   }
 
   function handleRemoveExternalAudio() {
     stopPlayback()
     externalPlayerRef.current = null
+    externalAudioBufferRef.current = null
     setExternalAudioName(null)
     setOffsetMs(0)
+  }
+
+  /**
+   * Deterministic offline export (SPEC §3 Flow 3): renders audio (synth or
+   * the uploaded file, offset-shifted) via renderAudio.ts, then hands it to
+   * exportMp4.ts alongside the same pure drawFrame the live player uses, and
+   * triggers a download of the resulting MP4.
+   */
+  async function handleExport() {
+    if (!score) return
+    stopPlayback()
+    setExportError(null)
+    setIsExporting(true)
+    setExportProgress(0)
+
+    try {
+      const ctx = ensureAudioContext()
+      await ctx.resume()
+
+      let instrumentNameForExport = config.instrumentName
+      if (!externalPlayerRef.current && !instrumentRef.current) {
+        const instrument = await loadInstrument(ctx)
+        instrumentRef.current = instrument
+        setInstrumentNames(instrument.instrumentNames)
+        const initialName =
+          config.instrumentName && instrument.instrumentNames.includes(config.instrumentName)
+            ? config.instrumentName
+            : instrument.defaultInstrumentName
+        if (initialName !== instrument.defaultInstrumentName) {
+          await instrument.setInstrument(initialName)
+        }
+        setSelectedInstrument(initialName)
+        instrumentNameForExport = initialName
+      }
+
+      const audioBuffer = await renderAudioTrack({
+        score,
+        instrumentName: instrumentNameForExport,
+        externalBuffer: externalAudioBufferRef.current,
+        externalOffsetSec: offsetMs / MS_PER_SEC,
+        startSec: playbackStartSec,
+        endSec: playbackEndSec,
+      })
+
+      const { width, height } = EXPORT_RESOLUTIONS[config.exportAspect]
+      const blob = await exportMp4({
+        score,
+        config,
+        audioBuffer,
+        width,
+        height,
+        startSec: playbackStartSec,
+        endSec: playbackEndSec,
+        onProgress: setExportProgress,
+      })
+
+      const baseName = midiFileName?.replace(/\.(mid|midi)$/i, '') ?? 'export'
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `melograffer-${baseName}.mp4`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : 'Export failed.')
+    } finally {
+      setIsExporting(false)
+    }
   }
 
   useEffect(() => {
@@ -389,6 +465,10 @@ function App() {
           instrumentNames={instrumentNames}
           selectedInstrument={selectedInstrument}
           onInstrumentChange={handleInstrumentChange}
+          onExport={handleExport}
+          isExporting={isExporting}
+          exportProgress={exportProgress}
+          exportError={exportError}
         />
         <div className="stage">
           <p>
@@ -454,7 +534,7 @@ function App() {
             onPointerUp={handleCanvasPointerUp}
           />
           <div>
-            <button onClick={handlePlayPause} disabled={!score || isLoadingAudio}>
+            <button onClick={handlePlayPause} disabled={!score || isLoadingAudio || isExporting}>
               {isLoadingAudio ? 'Loading…' : isPlaying ? 'Pause' : 'Play'}
             </button>
           </div>
