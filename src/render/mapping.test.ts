@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest'
 import {
   barDurationsSec,
   computePitchRange,
+  findNoteAt,
+  timeAtX,
+  xForNoteStart,
   isNoteActive,
   isNoteInWindow,
   pitchToY,
@@ -16,8 +19,11 @@ function note(overrides: Partial<Note> = {}): Note {
   return { startSec: 0, durationSec: 1, midiNote: 60, velocity: 1, ...overrides }
 }
 
-function scoreOf(notes: Note[]): Score {
-  return { tracks: [{ id: 't0', name: 'track', notes, color: '#fff', visible: true }], bars: [] }
+function scoreOf(notes: Note[], overrides: Partial<{ visible: boolean }> = {}): Score {
+  return {
+    tracks: [{ id: 't0', name: 'track', notes, color: '#fff', visible: overrides.visible ?? true }],
+    bars: [],
+  }
 }
 
 describe('radiusForDuration', () => {
@@ -100,6 +106,53 @@ describe('visibleTimeWindow / isNoteInWindow', () => {
     const justOutside = note({ startSec: window.endSec + 1 })
     expect(isNoteInWindow(justInside, window)).toBe(true)
     expect(isNoteInWindow(justOutside, window)).toBe(false)
+  })
+})
+
+describe('timeAtX', () => {
+  it('is the inverse of xForNoteStart', () => {
+    const width = 960
+    const t = 12.5
+    const x = xForNoteStart(20, t, DEFAULT_VIZ_CONFIG, width)
+    expect(timeAtX(x, t, DEFAULT_VIZ_CONFIG, width)).toBeCloseTo(20)
+  })
+
+  it('returns the current time at the playhead itself', () => {
+    const width = 960
+    const playheadPx = DEFAULT_VIZ_CONFIG.playheadX * width
+    expect(timeAtX(playheadPx, 7, DEFAULT_VIZ_CONFIG, width)).toBeCloseTo(7)
+  })
+})
+
+describe('findNoteAt', () => {
+  const width = 960
+  const height = 360
+
+  it('returns the note whose dot contains the point, and null on empty space', () => {
+    const target = note({ startSec: 11, durationSec: 1, midiNote: 60 })
+    const score = scoreOf([note({ startSec: 10, midiNote: 72 }), target])
+    const t = 10
+    const x = xForNoteStart(11, t, DEFAULT_VIZ_CONFIG, width)
+    const y = pitchToY(60, height, computePitchRange(score))
+
+    expect(findNoteAt(score, DEFAULT_VIZ_CONFIG, t, width, height, x, y)).toBe(target)
+    expect(findNoteAt(score, DEFAULT_VIZ_CONFIG, t, width, height, x, y - 100)).toBeNull()
+  })
+
+  it('ignores notes on hidden tracks', () => {
+    const score = scoreOf([note({ startSec: 10 })], { visible: false })
+    const x = xForNoteStart(10, 10, DEFAULT_VIZ_CONFIG, width)
+    const y = pitchToY(60, height, computePitchRange(score))
+    expect(findNoteAt(score, DEFAULT_VIZ_CONFIG, 10, width, height, x, y)).toBeNull()
+  })
+
+  it('picks the nearest dot when two overlap', () => {
+    const near = note({ startSec: 10, midiNote: 60 })
+    const far = note({ startSec: 10.05, midiNote: 61 })
+    const score = scoreOf([near, far])
+    const x = xForNoteStart(10, 10, DEFAULT_VIZ_CONFIG, width)
+    const y = pitchToY(60, height, computePitchRange(score))
+    expect(findNoteAt(score, DEFAULT_VIZ_CONFIG, 10, width, height, x, y)).toBe(near)
   })
 })
 

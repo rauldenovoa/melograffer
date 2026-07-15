@@ -74,6 +74,58 @@ export function radiusForDuration(
   return Math.max(raw, MIN_RADIUS_PX)
 }
 
+/** Inverse of xForNoteStart: the score time rendered at pixel column x. */
+export function timeAtX(
+  xPx: number,
+  timeSec: number,
+  config: VizConfig,
+  canvasWidth: number,
+): number {
+  const playheadPx = config.playheadX * canvasWidth
+  return timeSec + (xPx - playheadPx) / config.pxPerSec
+}
+
+/** Small dots stay clickable: hit radius never shrinks below this. */
+const MIN_HIT_RADIUS_PX = 6
+
+/**
+ * The visible note whose dot contains (or is nearest to, within its hit
+ * radius) the given canvas point — for click-to-seek. Null on empty space.
+ */
+export function findNoteAt(
+  score: Score,
+  config: VizConfig,
+  timeSec: number,
+  canvasWidth: number,
+  canvasHeight: number,
+  xPx: number,
+  yPx: number,
+): Note | null {
+  const pitchRange = computePitchRange(score)
+  const window = visibleTimeWindow(timeSec, config, canvasWidth)
+
+  let best: Note | null = null
+  let bestDist2 = Infinity
+  for (const track of score.tracks) {
+    if (!track.visible) continue
+    for (const note of track.notes) {
+      if (!isNoteInWindow(note, window)) continue
+      const x = xForNoteStart(note.startSec, timeSec, config, canvasWidth)
+      const y = pitchToY(note.midiNote, canvasHeight, pitchRange)
+      const hitR = Math.max(
+        radiusForDuration(note.durationSec, config.dotScale, config.radiusMode, canvasHeight),
+        MIN_HIT_RADIUS_PX,
+      )
+      const dist2 = (x - xPx) ** 2 + (y - yPx) ** 2
+      if (dist2 <= hitR * hitR && dist2 < bestDist2) {
+        best = note
+        bestDist2 = dist2
+      }
+    }
+  }
+  return best
+}
+
 export function isNoteActive(note: Note, timeSec: number): boolean {
   return timeSec >= note.startSec && timeSec < note.startSec + note.durationSec
 }

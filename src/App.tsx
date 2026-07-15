@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 import { parseMidi } from './midi/parseMidi'
 import { drawFrame } from './render/drawFrame'
-import { barDurationsSec, scoreDurationSec } from './render/mapping'
+import { barDurationsSec, findNoteAt, scoreDurationSec, timeAtX } from './render/mapping'
 import { loadInstrument, type Instrument } from './audio/instrument'
 import { PlaybackClock } from './audio/clock'
 import { scheduleScore, stopAll } from './audio/scheduler'
@@ -18,6 +18,9 @@ const MS_PER_SEC = 1000
 
 /** Audio restarts only after scrub events stop arriving for this long. */
 const SCRUB_SETTLE_MS = 150
+
+/** Pointer movement below this (canvas px) still counts as a click on release. */
+const DRAG_THRESHOLD_PX = 4
 
 function App() {
   const [score, setScore] = useState<Score | null>(null)
@@ -218,6 +221,58 @@ function App() {
     }
   }
 
+  const canvasDragRef = useRef<{
+    pointerId: number
+    startXPx: number
+    grabTimeSec: number
+    moved: boolean
+  } | null>(null)
+
+  /** Pointer position in canvas-pixel space (the canvas is CSS-scaled). */
+  function canvasPoint(e: React.PointerEvent<HTMLCanvasElement>) {
+    const canvas = canvasRef.current!
+    const rect = canvas.getBoundingClientRect()
+    const scaleX = rect.width > 0 ? canvas.width / rect.width : 1
+    const scaleY = rect.height > 0 ? canvas.height / rect.height : 1
+    return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY }
+  }
+
+  function handleCanvasPointerDown(e: React.PointerEvent<HTMLCanvasElement>) {
+    if (!score) return
+    const { x } = canvasPoint(e)
+    e.currentTarget.setPointerCapture?.(e.pointerId)
+    canvasDragRef.current = {
+      pointerId: e.pointerId,
+      startXPx: x,
+      grabTimeSec: timeAtX(x, timeSec, config, canvasRef.current!.width),
+      moved: false,
+    }
+  }
+
+  function handleCanvasPointerMove(e: React.PointerEvent<HTMLCanvasElement>) {
+    const drag = canvasDragRef.current
+    if (!drag || e.pointerId !== drag.pointerId || !score) return
+    const { x } = canvasPoint(e)
+    if (!drag.moved && Math.abs(x - drag.startXPx) < DRAG_THRESHOLD_PX) return
+    drag.moved = true
+    // Grab-the-score scrubbing: the moment grabbed on pointerdown stays under
+    // the cursor, so dragging left advances time and dragging right rewinds.
+    const playheadPx = config.playheadX * canvasRef.current!.width
+    scrubTo(drag.grabTimeSec - (x - playheadPx) / config.pxPerSec)
+  }
+
+  function handleCanvasPointerUp(e: React.PointerEvent<HTMLCanvasElement>) {
+    const drag = canvasDragRef.current
+    if (!drag || e.pointerId !== drag.pointerId) return
+    canvasDragRef.current = null
+    if (drag.moved || !score) return
+    // A clean click: jump to the clicked note, if any (empty space is a no-op).
+    const canvas = canvasRef.current!
+    const { x, y } = canvasPoint(e)
+    const note = findNoteAt(score, config, timeSec, canvas.width, canvas.height, x, y)
+    if (note) scrubTo(note.startSec)
+  }
+
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
@@ -306,7 +361,14 @@ function App() {
               </label>
             )}
           </div>
-          <canvas ref={canvasRef} width={CANVAS_WIDTH} height={CANVAS_HEIGHT} />
+          <canvas
+            ref={canvasRef}
+            width={CANVAS_WIDTH}
+            height={CANVAS_HEIGHT}
+            onPointerDown={handleCanvasPointerDown}
+            onPointerMove={handleCanvasPointerMove}
+            onPointerUp={handleCanvasPointerUp}
+          />
           <div>
             <button onClick={handlePlayPause} disabled={!score || isLoadingAudio}>
               {isLoadingAudio ? 'Loading…' : isPlaying ? 'Pause' : 'Play'}

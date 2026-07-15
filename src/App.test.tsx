@@ -280,6 +280,62 @@ describe('App', () => {
     expect(screen.getByLabelText(/audio file/i)).toBeInTheDocument()
   })
 
+  it('dragging the canvas scrubs: the grabbed moment follows the cursor', async () => {
+    render(<App />)
+    const buffer = readFileSync(resolve(__dirname, '../fixtures/multitrack.mid'))
+    fireEvent.change(document.querySelector('input[type="file"]')!, {
+      target: { files: [new File([buffer], 'multitrack.mid')] },
+    })
+    await waitFor(() => {
+      expect(screen.getByText(/staffA:/)).toBeInTheDocument()
+    })
+
+    const slider = screen.getByRole('slider', { name: /playback position/i }) as HTMLInputElement
+    const before = Number(slider.value)
+    const canvas = document.querySelector('canvas')!
+
+    // jsdom has no layout (rect is 0x0, canvas coords = client coords) and no
+    // PointerEvent — MouseEvents with pointer type names carry the coordinates.
+    // Dragging 120px left at the default 120 px/s advances time by 1s.
+    fireEvent(canvas, new MouseEvent('pointerdown', { bubbles: true, clientX: 500, clientY: 100 }))
+    fireEvent(canvas, new MouseEvent('pointermove', { bubbles: true, clientX: 380, clientY: 100 }))
+    fireEvent(canvas, new MouseEvent('pointerup', { bubbles: true, clientX: 380, clientY: 100 }))
+
+    expect(Number(slider.value)).toBeCloseTo(before + 1, 5)
+  })
+
+  it('clicking a dot jumps the playhead to that note', async () => {
+    const { parseMidi } = await import('./midi/parseMidi')
+    const { computePitchRange, pitchToY, xForNoteStart } = await import('./render/mapping')
+    const { loadVizConfig } = await import('./config/storage')
+
+    render(<App />)
+    const buffer = readFileSync(resolve(__dirname, '../fixtures/multitrack.mid'))
+    fireEvent.change(document.querySelector('input[type="file"]')!, {
+      target: { files: [new File([buffer], 'multitrack.mid')] },
+    })
+    await waitFor(() => {
+      expect(screen.getByText(/staffA:/)).toBeInTheDocument()
+    })
+
+    const slider = screen.getByRole('slider', { name: /playback position/i }) as HTMLInputElement
+    const timeSec = Number(slider.value)
+    const config = loadVizConfig()
+    const score = parseMidi(
+      buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as ArrayBuffer,
+    )
+    // Aim at the first note of the first track, wherever it renders now.
+    const target = score.tracks[0].notes[0]
+    const x = xForNoteStart(target.startSec, timeSec, config, 960)
+    const y = pitchToY(target.midiNote, 360, computePitchRange(score))
+
+    const canvas = document.querySelector('canvas')!
+    fireEvent(canvas, new MouseEvent('pointerdown', { bubbles: true, clientX: x, clientY: y }))
+    fireEvent(canvas, new MouseEvent('pointerup', { bubbles: true, clientX: x, clientY: y }))
+
+    expect(Number(slider.value)).toBeCloseTo(target.startSec, 5)
+  })
+
   it('starts the timeline two bars early and ends two bars after the last note (lead-in/out)', async () => {
     render(<App />)
     const buffer = readFileSync(resolve(__dirname, '../fixtures/multitrack.mid'))
