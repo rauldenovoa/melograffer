@@ -147,7 +147,11 @@ export function ConfigPanel({
           />
           <span>Connecting lines</span>
         </label>
-        <button type="button" onClick={() => onConfigChange({ ...DEFAULT_VIZ_CONFIG })}>
+        <button
+          type="button"
+          className="btn btn-ghost"
+          onClick={() => onConfigChange({ ...DEFAULT_VIZ_CONFIG })}
+        >
           Reset to defaults
         </button>
       </fieldset>
@@ -217,7 +221,12 @@ export function ConfigPanel({
             <option value="portrait">Portrait 9:16 (Reels/Stories)</option>
           </select>
         </label>
-        <button type="button" onClick={onExport} disabled={!score || isExporting}>
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={onExport}
+          disabled={!score || isExporting}
+        >
           {isExporting ? `Exporting… ${Math.round(exportProgress * 100)}%` : 'Export MP4'}
         </button>
         {exportError && <p className="export-error">{exportError}</p>}

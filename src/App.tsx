@@ -24,6 +24,16 @@ const SCRUB_SETTLE_MS = 150
 /** Pointer movement below this (canvas px) still counts as a click on release. */
 const DRAG_THRESHOLD_PX = 4
 
+const SEC_PER_MIN = 60
+
+/** Formats a non-negative second count as m:ss for the transport readout. */
+function formatTime(sec: number): string {
+  const clamped = Math.max(0, sec)
+  const minutes = Math.floor(clamped / SEC_PER_MIN)
+  const seconds = Math.floor(clamped % SEC_PER_MIN)
+  return `${minutes}:${String(seconds).padStart(2, '0')}`
+}
+
 function App() {
   const [score, setScore] = useState<Score | null>(null)
   const [config, setConfig] = useState(() => loadVizConfig())
@@ -314,15 +324,31 @@ function App() {
     if (note) scrubTo(note.startSec)
   }
 
-  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
+  async function loadMidiFile(file: File) {
     stopPlayback()
     const buffer = await file.arrayBuffer()
     const newScore = parseMidi(buffer)
     setScore(newScore)
     setMidiFileName(file.name)
     setTimeSec(-config.leadInBars * barDurationsSec(newScore).first)
+  }
+
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    await loadMidiFile(file)
+  }
+
+  /** Lets the canvas frame act as a MIDI drop target (SPEC Flow 1's "drop a .mid file"). */
+  function handleCanvasDragOver(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault()
+  }
+
+  async function handleCanvasDrop(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault()
+    const file = e.dataTransfer.files?.[0]
+    if (!file) return
+    await loadMidiFile(file)
   }
 
   async function handleAudioFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -458,11 +484,39 @@ function App() {
   }, [])
 
   return (
-    <main className="app">
-      <h1>
-        <img src="/images/melograffer_title_dark.png" alt="Melograffer" className="title-image" />
-      </h1>
-      <div className="layout">
+    <div className="app-shell">
+      <header className="app-bar">
+        <h1 className="brand">
+          <img src="/images/melograffer_title_dark.png" alt="Melograffer" className="brand-mark" />
+        </h1>
+        <div className="app-bar-actions">
+          <button type="button" className="btn" onClick={() => midiFileInputRef.current?.click()}>
+            {midiFileName ? 'Change MIDI' : 'Choose MIDI'}
+          </button>
+          <input
+            ref={midiFileInputRef}
+            type="file"
+            accept=".mid,.midi"
+            aria-label="MIDI file"
+            onChange={handleFileChange}
+            className="visually-hidden"
+          />
+          {!externalAudioName && (
+            <label className="btn btn-ghost file-label">
+              Audio file
+              <input
+                type="file"
+                accept="audio/*,.mp3,.wav"
+                aria-label="Audio file"
+                onChange={handleAudioFileChange}
+                className="visually-hidden"
+              />
+            </label>
+          )}
+        </div>
+      </header>
+
+      <div className="workspace">
         <ConfigPanel
           config={config}
           onConfigChange={setConfig}
@@ -476,8 +530,8 @@ function App() {
           exportProgress={exportProgress}
           exportError={exportError}
         />
-        <div className="stage">
-          <p>
+        <section className="stage">
+          <p className="file-status">
             {midiFileName ? (
               <>
                 MIDI: <strong>{midiFileName}</strong>
@@ -486,78 +540,85 @@ function App() {
               'Drop a MIDI file to see its tracks.'
             )}
           </p>
-          <button type="button" onClick={() => midiFileInputRef.current?.click()}>
-            Choose File
-          </button>
-          <input
-            ref={midiFileInputRef}
-            type="file"
-            accept=".mid,.midi"
-            aria-label="MIDI file"
-            onChange={handleFileChange}
-            style={{ display: 'none' }}
-          />
-          <div className="external-audio">
-            {externalAudioName ? (
-              <>
-                <span>
-                  Audio: <strong>{externalAudioName}</strong>
-                </span>
-                <button type="button" onClick={handleRemoveExternalAudio}>
-                  Remove
+
+          <div
+            className="canvas-frame"
+            onDragOver={handleCanvasDragOver}
+            onDrop={handleCanvasDrop}
+          >
+            {!score && (
+              <div className="canvas-empty">
+                <p className="canvas-empty-title">Drop a MIDI file here</p>
+                <p className="canvas-empty-sub">or</p>
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => midiFileInputRef.current?.click()}
+                >
+                  Browse files
                 </button>
-                <label className="config-row">
-                  <span>Audio offset ({offsetMs} ms)</span>
-                  <input
-                    type="range"
-                    aria-label="Audio offset"
-                    min={-1000}
-                    max={1000}
-                    step={5}
-                    value={offsetMs}
-                    onChange={handleOffsetChange}
-                  />
-                </label>
-              </>
-            ) : (
-              <label>
-                Audio file (optional, replaces synth):{' '}
+              </div>
+            )}
+            <canvas
+              ref={canvasRef}
+              width={CANVAS_WIDTH}
+              height={CANVAS_HEIGHT}
+              onPointerDown={handleCanvasPointerDown}
+              onPointerMove={handleCanvasPointerMove}
+              onPointerUp={handleCanvasPointerUp}
+            />
+          </div>
+
+          {externalAudioName && (
+            <div className="audio-row">
+              <span className="file-chip">
+                Audio: <strong>{externalAudioName}</strong>
+              </span>
+              <button type="button" className="btn btn-ghost" onClick={handleRemoveExternalAudio}>
+                Remove
+              </button>
+              <label className="config-row">
+                <span>Audio offset ({offsetMs} ms)</span>
                 <input
-                  type="file"
-                  accept="audio/*,.mp3,.wav"
-                  aria-label="Audio file"
-                  onChange={handleAudioFileChange}
+                  type="range"
+                  aria-label="Audio offset"
+                  min={-1000}
+                  max={1000}
+                  step={5}
+                  value={offsetMs}
+                  onChange={handleOffsetChange}
                 />
               </label>
-            )}
-          </div>
-          <canvas
-            ref={canvasRef}
-            width={CANVAS_WIDTH}
-            height={CANVAS_HEIGHT}
-            onPointerDown={handleCanvasPointerDown}
-            onPointerMove={handleCanvasPointerMove}
-            onPointerUp={handleCanvasPointerUp}
-          />
-          <div>
-            <button onClick={handlePlayPause} disabled={!score || isLoadingAudio || isExporting}>
+            </div>
+          )}
+
+          <div className="transport">
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={handlePlayPause}
+              disabled={!score || isLoadingAudio || isExporting}
+            >
               {isLoadingAudio ? 'Loading…' : isPlaying ? 'Pause' : 'Play'}
             </button>
+            <input
+              type="range"
+              className="scrub"
+              aria-label="Playback position"
+              min={playbackStartSec}
+              max={playbackEndSec}
+              step={0.01}
+              value={Math.min(Math.max(timeSec, playbackStartSec), playbackEndSec)}
+              disabled={!score}
+              onChange={handleSeek}
+            />
+            <span className="time-readout">
+              {formatTime(timeSec - playbackStartSec)} / {formatTime(playbackEndSec - playbackStartSec)}
+            </span>
           </div>
-          <input
-            type="range"
-            className="scrub"
-            aria-label="Playback position"
-            min={playbackStartSec}
-            max={playbackEndSec}
-            step={0.01}
-            value={Math.min(Math.max(timeSec, playbackStartSec), playbackEndSec)}
-            disabled={!score}
-            onChange={handleSeek}
-          />
-        </div>
+        </section>
       </div>
-    </main>
+    </div>
   )
 }
 
