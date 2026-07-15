@@ -13,8 +13,15 @@ export interface Track {
   visible: boolean
 }
 
+export interface Bar {
+  /** 1-based measure number, continuous across time-signature changes. */
+  number: number
+  startSec: number
+}
+
 export interface Score {
   tracks: Track[]
+  bars: Bar[]
 }
 
 export interface VizConfig {

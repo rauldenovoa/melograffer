@@ -37,4 +37,28 @@ describe('parseMidi', () => {
     expect(score.tracks[1].notes).toHaveLength(74)
     expect(score.tracks[0].color).not.toBe(score.tracks[1].color)
   })
+
+  it('computes bars numbered from 1, starting at 0s, strictly increasing in time', () => {
+    const score = parseMidi(loadFixture('bach_invention.mid'))
+
+    expect(score.bars.length).toBeGreaterThan(1)
+    expect(score.bars[0]).toEqual({ number: 1, startSec: 0 })
+    for (let i = 1; i < score.bars.length; i++) {
+      expect(score.bars[i].number).toBe(i + 1)
+      expect(score.bars[i].startSec).toBeGreaterThan(score.bars[i - 1].startSec)
+    }
+  })
+
+  it('covers the whole piece with bars: last bar starts before the score ends', () => {
+    const score = parseMidi(loadFixture('fur_elise.mid'))
+
+    const lastNoteEnd = Math.max(
+      ...score.tracks.flatMap((t) => t.notes.map((n) => n.startSec + n.durationSec)),
+    )
+    const lastBar = score.bars[score.bars.length - 1]
+    expect(lastBar.startSec).toBeLessThan(lastNoteEnd)
+    // Bars must reach near the end of the piece, not stop after the first
+    // time-signature segment.
+    expect(lastBar.startSec).toBeGreaterThan(lastNoteEnd * 0.8)
+  })
 })

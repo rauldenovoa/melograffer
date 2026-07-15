@@ -16,7 +16,7 @@ function note(overrides: Partial<Note> = {}): Note {
 }
 
 function scoreOf(notes: Note[]): Score {
-  return { tracks: [{ id: 't0', name: 'track', notes, color: '#fff', visible: true }] }
+  return { tracks: [{ id: 't0', name: 'track', notes, color: '#fff', visible: true }], bars: [] }
 }
 
 describe('radiusForDuration', () => {
@@ -106,6 +106,7 @@ describe('scoreDurationSec', () => {
         { id: 't0', name: 'a', notes: [note({ startSec: 0, durationSec: 1 })], color: '#fff', visible: true },
         { id: 't1', name: 'b', notes: [note({ startSec: 5, durationSec: 2 })], color: '#000', visible: true },
       ],
+      bars: [],
     }
     expect(scoreDurationSec(score)).toBe(7)
   })

@@ -16,6 +16,7 @@ function scoreOf(notes: Note[], overrides: Partial<{ color: string; visible: boo
     tracks: [
       { id: 't0', name: 'track', notes, color: overrides.color ?? '#ff0000', visible: overrides.visible ?? true },
     ],
+    bars: [],
   }
 }
 

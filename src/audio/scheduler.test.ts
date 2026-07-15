@@ -23,6 +23,7 @@ function score(overrides: Partial<Score['tracks'][number]> = {}): Score {
         ...overrides,
       },
     ],
+    bars: [],
   }
 }
 
