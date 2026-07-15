@@ -16,6 +16,9 @@ const CANVAS_HEIGHT = 360
 
 const MS_PER_SEC = 1000
 
+/** Audio restarts only after scrub events stop arriving for this long. */
+const SCRUB_SETTLE_MS = 150
+
 function App() {
   const [score, setScore] = useState<Score | null>(null)
   const [config, setConfig] = useState(() => loadVizConfig())
@@ -32,6 +35,16 @@ function App() {
   const externalPlayerRef = useRef<ExternalAudioPlayer | null>(null)
   const activeStopFnsRef = useRef<Array<() => void>>([])
   const rafRef = useRef<number | null>(null)
+  const pendingSoundTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Mirrors for state the debounced-restart timeout must read fresh (its
+  // closure would otherwise be stale by the time it fires).
+  const scoreRef = useRef(score)
+  scoreRef.current = score
+  const offsetMsRef = useRef(offsetMs)
+  offsetMsRef.current = offsetMs
+  const isPlayingRef = useRef(isPlaying)
+  isPlayingRef.current = isPlaying
 
   const duration = useMemo(() => (score ? scoreDurationSec(score) : 0), [score])
   const barSec = useMemo(
@@ -84,11 +97,38 @@ function App() {
     }
   }
 
+  function cancelPendingSoundRestart() {
+    if (pendingSoundTimerRef.current !== null) {
+      clearTimeout(pendingSoundTimerRef.current)
+      pendingSoundTimerRef.current = null
+    }
+  }
+
+  /**
+   * Silences everything immediately and restarts sound at the clock position
+   * once scrub events settle. Skipping while playing must never sound the
+   * notes between the old and new position — a drag emits dozens of change
+   * events and rescheduling on each one machine-gunned every note crossed.
+   */
+  function restartSoundDebounced() {
+    stopSound()
+    cancelPendingSoundRestart()
+    if (!isPlaying) return
+    pendingSoundTimerRef.current = setTimeout(() => {
+      pendingSoundTimerRef.current = null
+      const clock = clockRef.current
+      const currentScore = scoreRef.current
+      if (!isPlayingRef.current || !clock || !currentScore) return
+      startSoundAt(clock.getCurrentTimeSec(), currentScore, offsetMsRef.current)
+    }, SCRUB_SETTLE_MS)
+  }
+
   function stopPlayback() {
     if (rafRef.current !== null) {
       cancelAnimationFrame(rafRef.current)
       rafRef.current = null
     }
+    cancelPendingSoundRestart()
     stopSound()
     clockRef.current?.pause()
     setIsPlaying(false)
@@ -132,24 +172,25 @@ function App() {
     rafRef.current = requestAnimationFrame(runLoop)
   }
 
-  function handleSeek(e: React.ChangeEvent<HTMLInputElement>) {
-    const newTime = Number(e.target.value)
-    setTimeSec(newTime)
-    stopSound()
+  /** Seek to a timeline position (slider or canvas); audio restart is debounced. */
+  function scrubTo(sec: number) {
+    const clamped = Math.min(Math.max(sec, playbackStartSec), playbackEndRef.current)
+    setTimeSec(clamped)
+    if (isPlaying) clockRef.current?.seek(clamped)
+    restartSoundDebounced()
+  }
 
-    if (isPlaying && clockRef.current && score) {
-      clockRef.current.seek(newTime)
-      startSoundAt(newTime, score, offsetMs)
-    }
+  function handleSeek(e: React.ChangeEvent<HTMLInputElement>) {
+    scrubTo(Number(e.target.value))
   }
 
   function handleOffsetChange(e: React.ChangeEvent<HTMLInputElement>) {
     const newOffsetMs = Number(e.target.value)
     setOffsetMs(newOffsetMs)
+    offsetMsRef.current = newOffsetMs
 
-    if (isPlaying && externalPlayerRef.current && clockRef.current && score) {
-      stopSound()
-      startSoundAt(clockRef.current.getCurrentTimeSec(), score, newOffsetMs)
+    if (isPlaying && externalPlayerRef.current) {
+      restartSoundDebounced()
     }
   }
 

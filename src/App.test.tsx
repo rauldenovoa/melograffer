@@ -143,15 +143,23 @@ describe('App', () => {
     const stopFnsFromFirstSchedule = [...noteStopFns]
     expect(stopFnsFromFirstSchedule.length).toBeGreaterThan(0)
 
+    // A drag is a burst of change events — none of them may sound anything.
     const slider = screen.getByRole('slider', { name: /playback position/i })
     fireEvent.change(slider, { target: { value: '1' } })
+    fireEvent.change(slider, { target: { value: '3' } })
+    fireEvent.change(slider, { target: { value: '5' } })
 
     // Every note from the pre-seek schedule must be stopped exactly once...
     expect(stopFnsFromFirstSchedule.every((stop) => stop.mock.calls.length === 1)).toBe(true)
-    // ...and a fresh set of notes scheduled from the new position, none of them stopped yet.
-    const stopFnsFromSecondSchedule = noteStopFns.filter((stop) => !stopFnsFromFirstSchedule.includes(stop))
-    expect(stopFnsFromSecondSchedule.length).toBeGreaterThan(0)
-    expect(stopFnsFromSecondSchedule.every((stop) => stop.mock.calls.length === 0)).toBe(true)
+    // ...and nothing rescheduled yet while the scrub is still settling.
+    expect(noteStopFns.length).toBe(stopFnsFromFirstSchedule.length)
+
+    // After the scrub settles, exactly one fresh schedule from the final position.
+    await waitFor(() => {
+      const rescheduled = noteStopFns.filter((stop) => !stopFnsFromFirstSchedule.includes(stop))
+      expect(rescheduled.length).toBeGreaterThan(0)
+      expect(rescheduled.every((stop) => stop.mock.calls.length === 0)).toBe(true)
+    })
   })
 
   it('choosing a new file while playing stops the previous sound', async () => {
@@ -255,12 +263,14 @@ describe('App', () => {
 
     // Nudging the offset restarts the audio shifted by that many ms
     // (fake clock is still at the lead-in start, so -500ms of offset moves
-    // the delayed start 0.5s earlier).
+    // the delayed start 0.5s earlier). The restart is debounced.
     fireEvent.change(screen.getByRole('slider', { name: /audio offset/i }), {
       target: { value: '-500' },
     })
     expect(bufferSources[0].stop).toHaveBeenCalled()
-    expect(bufferSources).toHaveLength(2)
+    await waitFor(() => {
+      expect(bufferSources).toHaveLength(2)
+    })
     expect(bufferSources[1].start).toHaveBeenCalledWith(leadInSec - 0.5, 0)
 
     // Removing the audio pauses and stops the external source.
