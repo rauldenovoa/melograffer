@@ -21,20 +21,27 @@ function scoreOf(notes: Note[]): Score {
 
 describe('radiusForDuration', () => {
   it('sqrt mode: half-note area is exactly 2x quarter-note area', () => {
-    const quarter = radiusForDuration(0.5, 8, 'sqrt')
-    const half = radiusForDuration(1.0, 8, 'sqrt')
+    const quarter = radiusForDuration(0.5, 25, 'sqrt', 360)
+    const half = radiusForDuration(1.0, 25, 'sqrt', 360)
     const areaRatio = (half / quarter) ** 2
     expect(areaRatio).toBeCloseTo(2)
   })
 
+  it('scales relative to canvas height: same score at 1080p gets 3x the dot radius of 360p', () => {
+    const at360 = radiusForDuration(1, 25, 'sqrt', 360)
+    const at1080 = radiusForDuration(1, 25, 'sqrt', 1080)
+    expect(at360).toBe(9)
+    expect(at1080 / at360).toBeCloseTo(3)
+  })
+
   it('linear mode: radius stops growing past the cap', () => {
-    const atCap = radiusForDuration(2, 8, 'linear')
-    const beyondCap = radiusForDuration(10, 8, 'linear')
+    const atCap = radiusForDuration(2, 25, 'linear', 360)
+    const beyondCap = radiusForDuration(10, 25, 'linear', 360)
     expect(beyondCap).toBe(atCap)
   })
 
   it('never goes below the minimum radius', () => {
-    expect(radiusForDuration(0, 8, 'sqrt')).toBeGreaterThanOrEqual(1)
+    expect(radiusForDuration(0, 25, 'sqrt', 360)).toBeGreaterThanOrEqual(1)
   })
 })
 

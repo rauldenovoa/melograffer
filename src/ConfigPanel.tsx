@@ -3,6 +3,11 @@ import { DEFAULT_VIZ_CONFIG } from './render/defaultConfig'
 
 export type TrackPatch = Partial<Pick<Track, 'visible' | 'color'>>
 
+// Dormant: √duration won its trial as the default (linear stays implemented
+// in mapping.ts and VizConfig in case it's ever needed again); flip this to
+// resurrect the selector.
+const SHOW_RADIUS_MODE_SELECTOR = false
+
 interface ConfigPanelProps {
   config: VizConfig
   onConfigChange: (next: VizConfig) => void
@@ -68,23 +73,25 @@ export function ConfigPanel({ config, onConfigChange, score, onTrackChange }: Co
             type="range"
             aria-label="Dot scale"
             min={1}
-            max={20}
+            max={50}
             step={1}
             value={config.dotScale}
             onChange={(e) => set('dotScale', Number(e.target.value))}
           />
         </label>
-        <label className="config-row">
-          <span>Dot sizing</span>
-          <select
-            aria-label="Dot sizing mode"
-            value={config.radiusMode}
-            onChange={(e) => set('radiusMode', e.target.value as VizConfig['radiusMode'])}
-          >
-            <option value="sqrt">√duration</option>
-            <option value="linear">linear (capped)</option>
-          </select>
-        </label>
+        {SHOW_RADIUS_MODE_SELECTOR && (
+          <label className="config-row">
+            <span>Dot sizing</span>
+            <select
+              aria-label="Dot sizing mode"
+              value={config.radiusMode}
+              onChange={(e) => set('radiusMode', e.target.value as VizConfig['radiusMode'])}
+            >
+              <option value="sqrt">√duration</option>
+              <option value="linear">linear (capped)</option>
+            </select>
+          </label>
+        )}
         <label className="config-row">
           <span>Playhead position ({Math.round(config.playheadX * 100)}%)</span>
           <input

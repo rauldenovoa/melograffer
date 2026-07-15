@@ -54,15 +54,23 @@ export function xForNoteStart(
   return playheadPx + (startSec - timeSec) * config.pxPerSec
 }
 
+/**
+ * `dotScale` is relative to the canvas, not absolute pixels: it's the radius
+ * of a 1-second note in 1/1000ths of canvas height (dotScale 25 on a 360px
+ * canvas → 9px). Rendering the same score at 1080p (M6 export) scales the
+ * dots proportionally for free.
+ */
 export function radiusForDuration(
   durationSec: number,
   dotScale: number,
   radiusMode: VizConfig['radiusMode'],
+  canvasHeight: number,
 ): number {
+  const scalePx = (dotScale / 1000) * canvasHeight
   const raw =
     radiusMode === 'linear'
-      ? dotScale * Math.min(durationSec, LINEAR_CAP_SECONDS)
-      : dotScale * Math.sqrt(Math.max(durationSec, 0))
+      ? scalePx * Math.min(durationSec, LINEAR_CAP_SECONDS)
+      : scalePx * Math.sqrt(Math.max(durationSec, 0))
   return Math.max(raw, MIN_RADIUS_PX)
 }
 

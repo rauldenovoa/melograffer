@@ -3,7 +3,7 @@ import { loadVizConfig, saveVizConfig } from './storage'
 import { DEFAULT_VIZ_CONFIG } from '../render/defaultConfig'
 import type { VizConfig } from '../types'
 
-const STORAGE_KEY = 'melograffer.vizConfig.v1'
+const STORAGE_KEY = 'melograffer.vizConfig.v2'
 
 beforeEach(() => {
   localStorage.clear()

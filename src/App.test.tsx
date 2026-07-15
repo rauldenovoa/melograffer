@@ -269,7 +269,7 @@ describe('App', () => {
     fireEvent.change(speed, { target: { value: '300' } })
 
     await waitFor(() => {
-      const stored = JSON.parse(localStorage.getItem('melograffer.vizConfig.v1') ?? '{}')
+      const stored = JSON.parse(localStorage.getItem('melograffer.vizConfig.v2') ?? '{}')
       expect(stored.pxPerSec).toBe(300)
     })
 

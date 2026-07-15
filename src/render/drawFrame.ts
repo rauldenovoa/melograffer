@@ -117,7 +117,7 @@ export function drawFrame(
 
       const x = xForNoteStart(note.startSec, timeSec, config, width)
       const y = pitchToY(note.midiNote, height, pitchRange)
-      const radius = radiusForDuration(note.durationSec, config.dotScale, config.radiusMode)
+      const radius = radiusForDuration(note.durationSec, config.dotScale, config.radiusMode, height)
       const active = isNoteActive(note, timeSec)
 
       // Halo is drawn before the dot so the dot's edge stays crisp on top of it.

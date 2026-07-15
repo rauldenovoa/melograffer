@@ -1,7 +1,9 @@
 import type { VizConfig } from '../types'
 import { DEFAULT_VIZ_CONFIG } from '../render/defaultConfig'
 
-const STORAGE_KEY = 'melograffer.vizConfig.v1'
+// v2: dotScale changed from absolute pixels to canvas-relative units, so v1
+// entries are silently abandoned rather than misread.
+const STORAGE_KEY = 'melograffer.vizConfig.v2'
 
 type StorageLike = Pick<Storage, 'getItem' | 'setItem'>
 
