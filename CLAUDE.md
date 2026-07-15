@@ -47,7 +47,7 @@ Vite · React 18 · TypeScript strict · Canvas 2D · @tonejs/midi · WebCodecs 
   also returns `instrumentNames`/`defaultInstrumentName`/`setInstrument`;
   ConfigPanel shows a dropdown once Play has loaded the sampler; choice
   persists as `VizConfig.instrumentName`. Per-track GM instruments remain
-  Out (later) — SPEC.md now has the concrete bypass plan (sf2.presets
+  To Do #5 (Next) — SPEC.md now has the concrete bypass plan (sf2.presets
   bank/program + smplr's `sf2InstrumentToPreset`).
 - M5 done: `Score.bars` (measure starts from the time-signature map,
   4/4 fallback, computed in `parseMidi`); `drawFrame` draws bar lines +
@@ -98,4 +98,4 @@ Vite · React 18 · TypeScript strict · Canvas 2D · @tonejs/midi · WebCodecs 
 - Read SPEC.md before non-trivial changes. Do not restate it; reference sections.
 - No new dependencies without stating why in the commit message.
 - If stuck after 2 attempts, stop and summarize the problem instead of thrashing.
-- Do not pre-build "Out (later)" features (MusicXML, DTW alignment, OMR).
+- Do not pre-build "To Do — Later" features (MusicXML, DTW alignment, OMR).

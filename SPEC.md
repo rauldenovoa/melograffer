@@ -19,21 +19,31 @@ A client-only web app that turns a MIDI score into a smalin-style scrolling musi
 - MP4 export: offline frame-by-frame render via WebCodecs → mux with `mp4-muxer`; audio track from OfflineAudioContext render (Audio A) or the uploaded file (Audio B). Deterministic: frame N drawn at exactly N/fps seconds — never screen capture.
 - 1080p/60fps export target (canvas preview can be lower res); output aspect-ratio presets for common platforms (e.g. YouTube 16:9 landscape, Instagram 9:16 portrait for Reels/Stories/feed)
 
-**Out (later):**
-- MusicXML input (easy add; do after MVP proves the pipeline)
-- Real-recording alignment: separate offline Python tool (synctoolbox/librosa DTW → tempo map → warped MIDI that this app consumes unchanged). Do NOT build into the web app.
-- PDF/scanned score input (OMR — Audiveris or similar; unreliable, evaluate later)
-- Bar/ribbon note shapes as alternative to dots
-- Presets/themes, piece library
-- Swappable/multiple soundfont support (M4 bundled `ChaosBank.sf2` for its CC0 license; a future milestone could let a different `.sf2` be swapped in/tested without re-litigating that choice)
-- Modular visualization styles ("renderers"): support multiple pluggable viz styles beyond the current BALLS-style dots, each with its own shape/motion/color-preset behavior, user-selectable — as in Malinowski's MAM "Renderers" (musanim.com/Renderers/)
-- Harmonic coloring option (musanim.com/HarmonicColoring/)
-- "Organic" scroll: nonlinear (e.g. logarithmic) time-axis warp that eases around the currently-sounding note instead of constant-speed scroll
-- SF2 volume envelope (ADSR): smplr ignores it, so notes cut off abruptly at release instead of decaying naturally — audio-quality polish, not urgent
-- Per-track instruments honoring each track's actual GM program number (GM = General MIDI, the standard 128-slot program-number → instrument-sound mapping, e.g. program 0 = Acoustic Grand Piano, 40 = Violin). Harder than the (now-shipped) global selector: smplr's `Soundfont2` wrapper only exposes the SF2 file's raw *instrument* names (`instrumentNames`/`loadInstrument(name)`), never the *preset* layer where GM bank/program numbers actually live. The fix isn't a name-mapping table — the `soundfont2` parser we already depend on parses `sf2.presets[i].header.{bank, preset}` correctly; the real GM address is already there, smplr's wrapper just never reads it. Approach: look up presets by bank+program ourselves, pull each preset's instrument(s), run them through the existing `applyZoneGenerators` patch plus smplr's exported `sf2InstrumentToPreset()` helper, and play them via smplr's lower-level `Sampler` class instead of its `Soundfont2` convenience wrapper — one `Sampler` per distinct program number a piece actually uses. Also needs each track's program number captured in `Score` (currently discarded in `parseMidi.ts`, though `@tonejs/midi` already parses it as `track.instrument.number`). Worth checking first whether `spessasynth_lib` (M4's original candidate, passed over for smplr) does bank/program addressing natively — could replace this bypass entirely, at the cost of re-verifying offline rendering support and pitch/loop correctness against it.
-- Sounding-note clone: toggle to have it track the melody line vertically (still riding the playhead horizontally, but y-position follows whichever pitch is currently sounding) instead of the current fixed-position behavior.
-- Sounding-note outline: try flashing brighter than the dot's base color (vs. today's full-opacity-then-decay of the same color) — worth an A/B look.
-- Multi-note-per-voice-at-once behavior (e.g. LH bass line + RH chords, or vice versa): current connecting-lines/clone logic assumes one sounding note per voice at a time; revisit how it should look when a track has simultaneous notes (chords).
+**To Do** (not yet assigned to a milestone; numbered for cross-reference from future milestones):
+
+*Now:*
+1. Full-screen the visualization area, YouTube-style, with keyboard shortcut `F`.
+2. Cap the max size of the Tracks panel so it displays ~3 tracks comfortably; more than that scrolls (e.g. the Led Zeppelin "Stairway to Heaven" fixture, which has many tracks).
+3. Color distinct hands/voices within a single-track MIDI differently (e.g. Debussy's "Arabesque No. 1" fixture, which has no separate tracks per hand) — needs a voice-separation heuristic (e.g. pitch-range split or overlapping-note clustering) since there's no track/channel boundary to key off of.
+
+*Next:*
+4. Visual design revamp.
+5. Per-track instruments honoring each track's actual GM program number (GM = General MIDI, the standard 128-slot program-number → instrument-sound mapping, e.g. program 0 = Acoustic Grand Piano, 40 = Violin). Harder than the (now-shipped) global selector: smplr's `Soundfont2` wrapper only exposes the SF2 file's raw *instrument* names (`instrumentNames`/`loadInstrument(name)`), never the *preset* layer where GM bank/program numbers actually live. The fix isn't a name-mapping table — the `soundfont2` parser we already depend on parses `sf2.presets[i].header.{bank, preset}` correctly; the real GM address is already there, smplr's wrapper just never reads it. Approach: look up presets by bank+program ourselves, pull each preset's instrument(s), run them through the existing `applyZoneGenerators` patch plus smplr's exported `sf2InstrumentToPreset()` helper, and play them via smplr's lower-level `Sampler` class instead of its `Soundfont2` convenience wrapper — one `Sampler` per distinct program number a piece actually uses. Also needs each track's program number captured in `Score` (currently discarded in `parseMidi.ts`, though `@tonejs/midi` already parses it as `track.instrument.number`). Worth checking first whether `spessasynth_lib` (M4's original candidate, passed over for smplr) does bank/program addressing natively — could replace this bypass entirely, at the cost of re-verifying offline rendering support and pitch/loop correctness against it.
+6. Multi-note-per-voice-at-once behavior (e.g. LH bass line + RH chords, or vice versa): current connecting-lines/clone logic assumes one sounding note per voice at a time; revisit how it should look when a track has simultaneous notes (chords).
+7. Sounding-note clone: toggle to have it track the melody line vertically (still riding the playhead horizontally, but y-position follows whichever pitch is currently sounding) instead of the current fixed-position behavior.
+8. Sounding-note outline: try flashing brighter than the dot's base color (vs. today's full-opacity-then-decay of the same color) — worth an A/B look.
+9. "Organic" scroll: nonlinear (e.g. logarithmic) time-axis warp that eases around the currently-sounding note instead of constant-speed scroll.
+10. Swappable/multiple soundfont support (M4 bundled `ChaosBank.sf2` for its CC0 license; a future milestone could let a different `.sf2` be swapped in/tested without re-litigating that choice).
+11. Presets/themes, piece library.
+12. Bar/ribbon note shapes as alternative to dots.
+13. Modular visualization styles ("renderers"): support multiple pluggable viz styles beyond the current BALLS-style dots, each with its own shape/motion/color-preset behavior, user-selectable — as in Malinowski's MAM "Renderers" (musanim.com/Renderers/).
+14. Harmonic coloring option (musanim.com/HarmonicColoring/).
+15. SF2 volume envelope (ADSR): smplr ignores it, so notes cut off abruptly at release instead of decaying naturally — audio-quality polish, not urgent.
+
+*Later:*
+16. MusicXML input (easy add; do after MVP proves the pipeline).
+17. Real-recording alignment: separate offline Python tool (synctoolbox/librosa DTW → tempo map → warped MIDI that this app consumes unchanged). Do NOT build into the web app.
+18. PDF/scanned score input (OMR — Audiveris or similar; unreliable, evaluate later).
 
 **Never:**
 - No auth, no database, no server-side rendering, no Supabase. Static site only.
