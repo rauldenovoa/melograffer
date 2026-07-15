@@ -23,75 +23,54 @@ Vite · React 18 · TypeScript strict · Canvas 2D · @tonejs/midi · WebCodecs 
 - Conventional commits; commit per milestone task.
 
 ## Current state
-- Milestone: 5 — Config UI + external audio (see SPEC.md §6) — DONE
-- M5 polish round (user feedback, 2026-07-15): dotScale is now canvas-relative
-  (1/1000ths of canvas height per √sec; storage key bumped to v2) so 1080p
-  export scales dots for free; range/default revised 2026-07-15 to 30–70,
-  default 50 (was too small at 1–50/25) — ConfigPanel shows this as a
-  default-relative percentage (60%–140%, `config.dotScale / DEFAULT.dotScale`)
-  rather than the raw unit, which is meaningless to a user; radius-mode selector
-  hidden but dormant (`SHOW_RADIUS_MODE_SELECTOR` in ConfigPanel.tsx);
-  lead-in/lead-out silence in bars (default 2 each, sized from the score's
-  first/last measured bar; timeline starts at negative seconds; REPLACED the
-  automatic scroll-off end buffer); seek/scrub audio restart debounced 150ms
-  (`restartSoundDebounced`) so skips never machine-gun crossed notes; canvas
-  grab-drag scrubbing + click-a-dot-to-seek (pure helpers `timeAtX`/
-  `findNoteAt` in mapping.ts); spacebar play/pause when no form control has
-  focus; halo replaced by sounding-note animation — played notes become
-  hollow rings forever (fill transparent from onset), outline flashes opaque
-  and decays exponentially (`decayEnvelope`, k=5, normalized to hit resting
-  alpha exactly at note end), plus a borderless clone riding the playhead
-  that shrinks/fades to nothing by note end (clone pass skips window culling
-  so long notes with off-screen starts still animate). Global instrument
-  selector added post-M5 (2026-07-15): `loadInstrument` (instrument.ts) now
-  also returns `instrumentNames`/`defaultInstrumentName`/`setInstrument`;
-  ConfigPanel shows a dropdown once Play has loaded the sampler; choice
-  persists as `VizConfig.instrumentName`. Per-track GM instruments remain
-  To Do #5 (Next) — SPEC.md now has the concrete bypass plan (sf2.presets
-  bank/program + smplr's `sf2InstrumentToPreset`).
-- M5 done: `Score.bars` (measure starts from the time-signature map,
-  4/4 fallback, computed in `parseMidi`); `drawFrame` draws bar lines +
-  numbers and per-voice connecting lines behind the dots (3 new VizConfig
-  toggles); config sidebar `src/ConfigPanel.tsx` (track show/hide + color,
-  bg, speed, dot scale, radius mode, playhead, toggles) persisted via
-  `src/config/storage.ts` (localStorage, field-by-field validation);
-  external audio (Flow 2) in `src/audio/externalAudio.ts` — uploaded
-  mp3/wav plays via AudioBufferSourceNode instead of the synth, ±1000ms
-  offset slider restarts the source live; hiding a track mid-play
-  reschedules synth audio; scroll-off buffer now derives from live
-  `pxPerSec` (old baked-in constant trap resolved); debug note counters
-  removed.
-- M4 done: `src/audio/{clock,instrument,scheduler}.ts` + Play/Pause/seek in
-  `App.tsx` (rAF-driven `timeSec`, never Date.now/performance.now). Audio
-  schedules notes straight from `Score` (no second MIDI parse). SoundFont
-  `public/soundfonts/ChaosBank.sf2` (CC0 1.0, rKhive) over GPLv2
-  `TimGM6mb.sf2` — deliberate, see SPEC §3 "swappable soundfont". Fixture
-  `fixtures/fur_elise.mid` added for the §8 drift check. Offline-render
-  smoke-tested — de-risks M6.
-- SF2 bugs RESOLVED (2026-07-14): smplr's SF2→preset conversion reads only raw
-  sample headers, ignoring zone generators. Two audible consequences, both
-  fixed by `applyZoneGenerators` (instrument.ts): (1) pitch — root key lives
-  in gen 58 when originalPitch is the "unset" 255→60 fallback, so zones played
-  as middle-C recordings; (2) "ghost" note repeats — gens 2/3/45/50 narrow the
-  nominal whole-sample loop to a short sustain tail, and gen 54 defaults to
-  no-loop; ignoring them re-struck the attack every loop wrap on held notes.
-  Don't resurrect "parse pitch from sample name" — dead end, checked.
-- Known simplifications / traps: no devicePixelRatio scaling; VizConfig
-  persists but per-track colors/visibility are session-only (reset on file
-  load — per-file persistence would need a file identity key, deferred);
-  external-audio offset is session-only too; playback end is MIDI-driven, so
-  an external audio file longer than the MIDI gets cut off at scroll-out;
-  one shared instrument for all tracks — smplr still drops
-  velRange/vol-envelope/tuning generators (only 58+54+2/3/45/50 patched), so
-  per-track GM instruments may hit layered patches; the `/piano/i` name
-  heuristic is file-specific (GeneralUser.sf2 has no "piano" name at all —
-  smplr reads low-level instrument names, not presets); scheduler.ts's
-  upfront full-piece scheduling is untested at SPEC §5's dense-orchestral
-  scale; M6's exporter needs explicit note durations — scheduler.ts's
-  setTimeout note-offs never fire in a faster-than-realtime offline render,
-  and in external-audio mode the exporter must pull audio from the uploaded
-  buffer (offset-shifted), not the synth.
-- Next: Milestone 6 — MP4 export
+- Milestone: 6 — MP4 export (see SPEC.md §6) — DONE (2026-07-15)
+- M6 done: `src/export/{frameTiming,renderAudio,exportMp4}.ts`. `frameTiming.ts`
+  (pure, unit-tested) maps frame N → exactly `startSec + N/fps`. `renderAudio.ts`
+  renders audio offline via `OfflineAudioContext`: synth path uses new
+  `scheduleScoreOffline` (scheduler.ts) — same visible/overlap logic as the
+  live `scheduleScore` but passes each note's `duration` to `Instrument.start`
+  (now an optional opt) instead of a `setTimeout` note-off, since a
+  faster-than-realtime offline render never reaches a real timer; external-audio
+  path reuses `externalAudioStartParams`. `exportMp4.ts` draws every frame with
+  the same `drawFrame` onto an `OffscreenCanvas`, encodes via WebCodecs
+  (`VideoEncoder`/`AudioEncoder`, H.264 High@5.1 + AAC-LC), and muxes with
+  `mp4-muxer` (new dep — SPEC §3/§4 mandate it; WebCodecs itself is a native
+  browser API). WebCodecs-only: throws `UnsupportedBrowserError` on unsupported
+  browsers rather than falling back to MediaRecorder/WebM (that fallback is
+  now To Do #19 (Later)). `VizConfig.exportAspect` ('landscape'/'portrait',
+  persisted) picks 1920×1080 vs 1080×1920 (`EXPORT_RESOLUTIONS`). ConfigPanel's
+  new "Export" fieldset has the aspect selector, an Export MP4 button, and a
+  progress readout; App.tsx's `handleExport` reuses the same lazy
+  instrument-load path as Play, then triggers a same-tab download.
+- M5 done (2026-07-15): config sidebar (`ConfigPanel.tsx`, persisted via
+  `config/storage.ts`) for track show/hide+color, bg, speed, canvas-relative
+  dot scale, playhead, bar-lines/numbers/connecting-lines; lead-in/lead-out
+  silence in bars (negative-second timeline); external audio (Flow 2,
+  `audio/externalAudio.ts`) with a live ±1000ms offset slider; canvas
+  grab-drag scrub + click-a-dot-to-seek (`timeAtX`/`findNoteAt` in
+  mapping.ts); spacebar play/pause; sounding-note animation (hollow rings +
+  decaying outline + playhead clone, `decayEnvelope` in mapping.ts); global
+  instrument selector (`loadInstrument` exposes `instrumentNames`/
+  `setInstrument`). Per-track GM instruments remain To Do #5 (Next) — SPEC.md
+  has the concrete bypass plan (`sf2.presets` bank/program + smplr's
+  `sf2InstrumentToPreset`).
+- M4 done: `src/audio/{clock,instrument,scheduler}.ts` + Play/Pause/seek
+  (rAF-driven, clock = `AudioContext.currentTime`, never Date.now). SoundFont
+  `public/soundfonts/ChaosBank.sf2` (CC0, rKhive) over GPLv2 `TimGM6mb.sf2` —
+  deliberate, SPEC §3 "swappable soundfont". `applyZoneGenerators`
+  (instrument.ts) patches smplr's SF2→preset conversion, which ignores zone
+  generators: root key (gen 58) and loop-window narrowing (gens 2/3/45/50/54) —
+  without it, multi-sampled instruments mis-pitch and held notes "ghost"-repeat
+  on loop wrap. Don't resurrect "parse pitch from sample name" — dead end.
+- Known simplifications / traps: no devicePixelRatio scaling; per-track
+  colors/visibility and external-audio offset are session-only (reset on file
+  load); playback end is MIDI-driven, so an external audio file longer than
+  the MIDI gets cut off; one shared instrument for all tracks (per-track GM
+  is #5 above); the `/piano/i` default-instrument heuristic is file-specific;
+  scheduler.ts's upfront full-piece scheduling is untested at SPEC §5's
+  dense-orchestral scale; M6's bar-line/number text and line widths don't
+  scale with export resolution the way dot radius does (cosmetic, not fixed).
+- Next: nothing assigned — see SPEC.md "To Do" for unscheduled work.
 <!-- Update this section at the end of every session; it replaces chat history. -->
 
 ## Rules
@@ -99,3 +78,4 @@ Vite · React 18 · TypeScript strict · Canvas 2D · @tonejs/midi · WebCodecs 
 - No new dependencies without stating why in the commit message.
 - If stuck after 2 attempts, stop and summarize the problem instead of thrashing.
 - Do not pre-build "To Do — Later" features (MusicXML, DTW alignment, OMR).
+- After a plan is approved (plan mode), copy it into `plans/milestone-N-<slug>.md` before implementing.
