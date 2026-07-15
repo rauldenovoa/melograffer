@@ -30,22 +30,25 @@ Vite · React 18 · TypeScript strict · Canvas 2D · @tonejs/midi · WebCodecs 
   ChaosBank.sf2` (CC0 1.0, rKhive) over GPLv2 `TimGM6mb.sf2` — deliberate,
   see SPEC §3 "swappable soundfont". Fixture `fixtures/fur_elise.mid` added
   for the §8 drift check. Offline-render smoke-tested — de-risks M6.
-- Pitch bug RESOLVED (2026-07-14): SF2 sample headers legitimately leave
-  originalPitch unset (255 → spec's 60 fallback); real root key is in zone
-  generator 58 (`OverridingRootKey`), which smplr's SF2→preset conversion
-  ignored, so multi-sampled zones played as if recorded at middle C. Fixed by
-  `applyOverridingRootKeys` (instrument.ts); verified spectrally. Don't
-  resurrect the "parse pitch from sample name" idea — dead end, checked.
+- SF2 bugs RESOLVED (2026-07-14): smplr's SF2→preset conversion reads only raw
+  sample headers, ignoring zone generators. Two audible consequences, both
+  fixed by `applyZoneGenerators` (instrument.ts): (1) pitch — root key lives
+  in gen 58 when originalPitch is the "unset" 255→60 fallback, so zones played
+  as middle-C recordings; (2) "ghost" note repeats — gens 2/3/45/50 narrow the
+  nominal whole-sample loop to a short sustain tail, and gen 54 defaults to
+  no-loop; ignoring them re-struck the attack every loop wrap on held notes.
+  Don't resurrect "parse pitch from sample name" — dead end, checked.
 - Known simplifications / traps: no devicePixelRatio scaling; no config UI
   (M5) — `SCROLL_OFF_BUFFER_SEC` (App.tsx) bakes in `pxPerSec`, must recompute
-  once editable; one shared instrument for all tracks — smplr also drops
-  velRange/envelope/tuning generators (only gen 58 patched), so per-track GM
-  instruments may hit layered patches; the `/piano/i` instrument-name
+  once editable; one shared instrument for all tracks — smplr still drops
+  velRange/vol-envelope/tuning generators (only 58+54+2/3/45/50 patched), so
+  per-track GM instruments may hit layered patches; the `/piano/i` name
   heuristic is file-specific (GeneralUser.sf2 has no "piano" name at all —
   smplr reads low-level instrument names, not presets); scheduler.ts's
   upfront full-piece scheduling is untested at SPEC §5's dense-orchestral
   scale; M6's exporter needs explicit note durations — scheduler.ts's
   setTimeout note-offs never fire in a faster-than-realtime offline render.
+  Per-track "note N/total" counters in the track list are debug UI, may go.
 - Next: Milestone 5 — Config UI + external audio
 <!-- Update this section at the end of every session; it replaces chat history. -->
 

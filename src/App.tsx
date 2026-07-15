@@ -131,11 +131,18 @@ function App() {
       <input type="file" accept=".mid,.midi" onChange={handleFileChange} />
       {score && (
         <ul>
-          {score.tracks.map((track) => (
-            <li key={track.id}>
-              {track.name} — {track.notes.length} notes
-            </li>
-          ))}
+          {score.tracks.map((track) => {
+            // Troubleshooting counter: 1-based index of the most recent note
+            // that has started by timeSec, so a heard glitch can be reported
+            // as an exact note number. Notes are in start-time order.
+            const startedCount = track.notes.filter((n) => n.startSec <= timeSec).length
+            return (
+              <li key={track.id}>
+                <span style={{ color: track.color }}>●</span> {track.name} — note{' '}
+                {startedCount}/{track.notes.length}
+              </li>
+            )
+          })}
         </ul>
       )}
       <canvas ref={canvasRef} width={CANVAS_WIDTH} height={CANVAS_HEIGHT} />

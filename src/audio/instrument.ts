@@ -11,14 +11,25 @@ const SOUNDFONT_URL = '/soundfonts/ChaosBank.sf2'
 const PREFERRED_INSTRUMENT_PATTERN = /piano/i
 
 /**
- * Per the SF2 spec, a sample header's originalPitch byte of 255 means
- * "unset" (parsers must fall back to 60 — the soundfont2 lib does), and the
- * authoritative root key then comes from the zone-level OverridingRootKey
- * generator (id 58). smplr's SF2→preset conversion reads only the header
- * byte and ignores gen 58, so every zone of a multi-sampled instrument
- * plays as if recorded at middle C. Bake gen 58 into the header copy smplr
- * reads. Headers are cloned per zone: one sample may serve several zones,
- * each with its own root key.
+ * smplr's SF2→preset conversion reads only the raw sample headers and ignores
+ * the zone generators that the SF2 spec says amend them. This rewrites each
+ * zone's header copy so the values smplr does read are the spec-correct ones:
+ *
+ * - Root key: an originalPitch byte of 255 means "unset" (parsers fall back
+ *   to 60 — the soundfont2 lib does), and the authoritative root key then
+ *   comes from gen 58 (OverridingRootKey). Without this, every zone of a
+ *   multi-sampled instrument plays as if recorded at middle C.
+ * - Looping: gen 54 (SampleModes) defaults to 0 = "no loop", but smplr loops
+ *   whenever the header carries loop points. Gens 2/3 (+ coarse 45/50) shift
+ *   the header loop points per zone — e.g. ChaosBank's piano headers nominally
+ *   loop the whole sample, attack included, and rely on these offsets to
+ *   narrow the loop to a short sustain tail. Ignoring them re-strikes the
+ *   attack transient on every loop wrap: audible "ghost" repeats of any note
+ *   held longer than its sample. Mode 3 ("loop until release") is approximated
+ *   as a continuous loop — smplr has no way to exit a loop at note-off.
+ *
+ * Headers are cloned per zone: one sample may serve several zones, each with
+ * its own root key and loop window.
  */
 type ParsedInstrument = SoundFont2['instruments'][number]
 // soundfont2's parser attaches a globalZone to each instrument at runtime,
@@ -27,22 +38,51 @@ type WithGlobalZone = ParsedInstrument & {
   globalZone?: { generators: ParsedInstrument['zones'][number]['generators'] }
 }
 
-export function applyOverridingRootKeys(sf2: SoundFont2) {
+const SAMPLE_MODE_LOOP_CONTINUOUS = 1
+const SAMPLE_MODE_LOOP_UNTIL_RELEASE = 3
+const COARSE_OFFSET_UNIT = 32768
+
+export function applyZoneGenerators(sf2: SoundFont2) {
   return {
     instruments: sf2.instruments.map((instrument: WithGlobalZone) => ({
       header: instrument.header,
       zones: instrument.zones.map((zone) => {
-        const rootKey =
-          zone.generators?.[GeneratorType.OverridingRootKey]?.value ??
-          instrument.globalZone?.generators?.[GeneratorType.OverridingRootKey]?.value
-        if (rootKey === undefined || rootKey < 0 || rootKey > 127) return zone
-        return {
-          ...zone,
-          sample: {
-            ...zone.sample,
-            header: { ...zone.sample.header, originalPitch: rootKey },
-          },
+        // Per the SF2 spec, a local zone's generator supersedes the
+        // instrument's global zone generator of the same type.
+        const gen = (type: GeneratorType) =>
+          zone.generators?.[type]?.value ??
+          instrument.globalZone?.generators?.[type]?.value
+
+        const header = { ...zone.sample.header }
+
+        const rootKey = gen(GeneratorType.OverridingRootKey)
+        if (rootKey !== undefined && rootKey >= 0 && rootKey <= 127) {
+          header.originalPitch = rootKey
         }
+
+        const mode = gen(GeneratorType.SampleModes) ?? 0
+        const loops =
+          mode === SAMPLE_MODE_LOOP_CONTINUOUS || mode === SAMPLE_MODE_LOOP_UNTIL_RELEASE
+        const startLoop = loops
+          ? header.startLoop +
+            (gen(GeneratorType.StartLoopAddrsOffset) ?? 0) +
+            COARSE_OFFSET_UNIT * (gen(GeneratorType.StartLoopAddrsCoarseOffset) ?? 0)
+          : 0
+        const endLoop = loops
+          ? header.endLoop +
+            (gen(GeneratorType.EndLoopAddrsOffset) ?? 0) +
+            COARSE_OFFSET_UNIT * (gen(GeneratorType.EndLoopAddrsCoarseOffset) ?? 0)
+          : 0
+        if (loops && startLoop >= 0 && endLoop > startLoop && endLoop <= zone.sample.data.length) {
+          header.startLoop = startLoop
+          header.endLoop = endLoop
+        } else {
+          // startLoop === endLoop reads as "no loop" to smplr's hasLoop check.
+          header.startLoop = 0
+          header.endLoop = 0
+        }
+
+        return { ...zone, sample: { ...zone.sample, header } }
       }),
     })),
   }
@@ -62,7 +102,7 @@ export interface Instrument {
 export async function loadInstrument(ctx: BaseAudioContext): Promise<Instrument> {
   const sampler = Soundfont2(ctx, {
     url: SOUNDFONT_URL,
-    createSoundfont: (data) => applyOverridingRootKeys(new SoundFont2(data)),
+    createSoundfont: (data) => applyZoneGenerators(new SoundFont2(data)),
   })
   await sampler.ready
 
