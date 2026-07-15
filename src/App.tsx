@@ -32,7 +32,9 @@ function App() {
   const [offsetMs, setOffsetMs] = useState(0)
   const [instrumentNames, setInstrumentNames] = useState<string[]>([])
   const [selectedInstrument, setSelectedInstrument] = useState('')
+  const [midiFileName, setMidiFileName] = useState<string | null>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const midiFileInputRef = useRef<HTMLInputElement>(null)
 
   const audioCtxRef = useRef<AudioContext | null>(null)
   const clockRef = useRef<PlaybackClock | null>(null)
@@ -313,6 +315,7 @@ function App() {
     const buffer = await file.arrayBuffer()
     const newScore = parseMidi(buffer)
     setScore(newScore)
+    setMidiFileName(file.name)
     setTimeSec(-config.leadInBars * barDurationsSec(newScore).first)
   }
 
@@ -386,8 +389,26 @@ function App() {
           onInstrumentChange={handleInstrumentChange}
         />
         <div className="stage">
-          <p>Drop a MIDI file to see its tracks.</p>
-          <input type="file" accept=".mid,.midi" aria-label="MIDI file" onChange={handleFileChange} />
+          <p>
+            {midiFileName ? (
+              <>
+                MIDI: <strong>{midiFileName}</strong>
+              </>
+            ) : (
+              'Drop a MIDI file to see its tracks.'
+            )}
+          </p>
+          <button type="button" onClick={() => midiFileInputRef.current?.click()}>
+            Choose File
+          </button>
+          <input
+            ref={midiFileInputRef}
+            type="file"
+            accept=".mid,.midi"
+            aria-label="MIDI file"
+            onChange={handleFileChange}
+            style={{ display: 'none' }}
+          />
           <div className="external-audio">
             {externalAudioName ? (
               <>

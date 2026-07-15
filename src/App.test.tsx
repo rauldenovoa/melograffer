@@ -82,6 +82,27 @@ describe('App', () => {
     })
   })
 
+  it('keeps showing the loaded MIDI filename after re-opening and cancelling the file dialog', async () => {
+    render(<App />)
+    const buffer = readFileSync(resolve(__dirname, '../fixtures/multitrack.mid'))
+    const file = new File([buffer], 'multitrack.mid')
+
+    const fileInput = document.querySelector('input[type="file"]')!
+    fireEvent.change(fileInput, { target: { files: [file] } })
+
+    await waitFor(() => {
+      expect(screen.getByText('multitrack.mid')).toBeInTheDocument()
+    })
+
+    // Cancelling the native picker can fire a change event with an empty
+    // FileList (or none at all) — either way the last loaded file's name,
+    // driven by our own state rather than the input's own display, must stay.
+    fireEvent.change(fileInput, { target: { files: [] } })
+
+    expect(screen.getByText('multitrack.mid')).toBeInTheDocument()
+    expect(screen.queryByText(/no file chosen/i)).not.toBeInTheDocument()
+  })
+
   it('shows a canvas and a scrub slider once a MIDI file is loaded', async () => {
     render(<App />)
     const buffer = readFileSync(resolve(__dirname, '../fixtures/multitrack.mid'))
