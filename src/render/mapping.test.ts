@@ -108,6 +108,16 @@ describe('visibleTimeWindow / isNoteInWindow', () => {
     expect(isNoteInWindow(justInside, window)).toBe(true)
     expect(isNoteInWindow(justOutside, window)).toBe(false)
   })
+
+  it('includes a note whose center is outside the window but whose radius still overlaps it', () => {
+    const window = visibleTimeWindow(10, DEFAULT_VIZ_CONFIG, 960)
+    // Center 0.5s past the right edge, but a 1s radius reaches back into it.
+    const largeDot = note({ startSec: window.endSec + 0.5 })
+    expect(isNoteInWindow(largeDot, window)).toBe(false)
+    expect(isNoteInWindow(largeDot, window, 1)).toBe(true)
+    // A too-small radius still doesn't reach.
+    expect(isNoteInWindow(largeDot, window, 0.1)).toBe(false)
+  })
 })
 
 describe('decayEnvelope', () => {

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { drawFrame, type CanvasLike2D } from './drawFrame'
-import { isNoteInWindow, visibleTimeWindow } from './mapping'
+import { isNoteInWindow, radiusForDuration, visibleTimeWindow } from './mapping'
 import { DEFAULT_VIZ_CONFIG } from './defaultConfig'
 import { parseMidi } from '../midi/parseMidi'
 import type { Note, Score } from '../types'
@@ -242,7 +242,11 @@ describe('drawFrame', () => {
     const timeSec = -80
 
     const window = visibleTimeWindow(timeSec, zoomedOutConfig, canvasWidth)
-    const expectedCount = notes.filter((n) => isNoteInWindow(n, window)).length
+    // All notes share the same duration, so their rendered radius (and thus
+    // radiusSec) is identical too.
+    const radiusSec =
+      radiusForDuration(0.05, zoomedOutConfig.dotScale, zoomedOutConfig.radiusMode, 360) / zoomedOutConfig.pxPerSec
+    const expectedCount = notes.filter((n) => isNoteInWindow(n, window, radiusSec)).length
     expect(expectedCount).toBeGreaterThan(0)
     expect(expectedCount).toBeLessThan(noteCount)
 

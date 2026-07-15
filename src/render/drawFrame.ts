@@ -119,11 +119,11 @@ export function drawFrame(
     if (!track.visible) continue
 
     for (const note of track.notes) {
-      if (!isNoteInWindow(note, window)) continue
+      const radius = radiusForDuration(note.durationSec, config.dotScale, config.radiusMode, height)
+      if (!isNoteInWindow(note, window, radius / config.pxPerSec)) continue
 
       const x = xForNoteStart(note.startSec, timeSec, config, width)
       const y = pitchToY(note.midiNote, height, pitchRange)
-      const radius = radiusForDuration(note.durationSec, config.dotScale, config.radiusMode, height)
 
       if (timeSec < note.startSec) {
         // Not yet played: filled dot, slightly transparent.

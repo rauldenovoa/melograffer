@@ -109,13 +109,13 @@ export function findNoteAt(
   for (const track of score.tracks) {
     if (!track.visible) continue
     for (const note of track.notes) {
-      if (!isNoteInWindow(note, window)) continue
-      const x = xForNoteStart(note.startSec, timeSec, config, canvasWidth)
-      const y = pitchToY(note.midiNote, canvasHeight, pitchRange)
       const hitR = Math.max(
         radiusForDuration(note.durationSec, config.dotScale, config.radiusMode, canvasHeight),
         MIN_HIT_RADIUS_PX,
       )
+      if (!isNoteInWindow(note, window, hitR / config.pxPerSec)) continue
+      const x = xForNoteStart(note.startSec, timeSec, config, canvasWidth)
+      const y = pitchToY(note.midiNote, canvasHeight, pitchRange)
       const dist2 = (x - xPx) ** 2 + (y - yPx) ** 2
       if (dist2 <= hitR * hitR && dist2 < bestDist2) {
         best = note
@@ -165,8 +165,17 @@ export function visibleTimeWindow(
   }
 }
 
-export function isNoteInWindow(note: Note, window: TimeWindow): boolean {
-  return note.startSec >= window.startSec && note.startSec <= window.endSec
+/**
+ * `radiusSec` is the note's own rendered dot radius converted to seconds
+ * (radiusPx / pxPerSec). Without it, a dot wider than CULL_PADDING_PX (large
+ * dots at high export resolutions routinely are) would still be fully
+ * off-screen when its *center* first satisfies the plain startSec check,
+ * making it visibly pop into existence mid-frame instead of scrolling in
+ * from the edge. Defaults to 0 for callers that don't render dots (bar
+ * lines, connecting-line segment culling).
+ */
+export function isNoteInWindow(note: Note, window: TimeWindow, radiusSec = 0): boolean {
+  return note.startSec + radiusSec >= window.startSec && note.startSec - radiusSec <= window.endSec
 }
 
 /** 4/4 at 120bpm — used when a score has too few bars to measure one. */
