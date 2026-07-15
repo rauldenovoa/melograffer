@@ -33,7 +33,7 @@ Vite · React 18 · TypeScript strict · Canvas 2D · @tonejs/midi · WebCodecs 
   faster-than-realtime offline render never reaches a real timer; external-audio
   path reuses `externalAudioStartParams`. `exportMp4.ts` draws every frame with
   the same `drawFrame` onto an `OffscreenCanvas`, encodes via WebCodecs
-  (`VideoEncoder`/`AudioEncoder`, H.264 High@5.1 + AAC-LC), and muxes with
+  (`VideoEncoder`/`AudioEncoder`, H.264 High@4.2 + AAC-LC), and muxes with
   `mp4-muxer` (new dep — SPEC §3/§4 mandate it; WebCodecs itself is a native
   browser API). WebCodecs-only: throws `UnsupportedBrowserError` on unsupported
   browsers rather than falling back to MediaRecorder/WebM (that fallback is
@@ -43,18 +43,22 @@ Vite · React 18 · TypeScript strict · Canvas 2D · @tonejs/midi · WebCodecs 
   progress readout; App.tsx's `handleExport` reuses the same lazy
   instrument-load path as Play, then triggers a same-tab download.
 - M6 bug-fix round (2026-07-15, user testing): synth-only exports were
-  totally silent — smplr's default Scheduler defers any note >~200ms ahead of
+  totally silent — smplr's default Scheduler defers notes >~200ms ahead of
   `currentTime` to a real `setInterval`, which never fires during an
-  `OfflineAudioContext` render; fixed by passing `scheduler: Scheduler(ctx,
-  { lookaheadMs: Infinity })` to `Soundfont2` when `ctx instanceof
-  OfflineAudioContext` (instrument.ts) so every note dispatches synchronously.
-  Also: `isNoteInWindow` (mapping.ts) now takes the note's own radius so large
-  dots scroll in instead of popping in at the edge; `EXPORT_RESOLUTIONS` uses
-  1088 (not 1080) on the non-16:9-exact side — mod-16 dims need no H.264 crop
-  metadata, which one real-world re-encode (iMessage/iCloud sync) appeared to
-  mishandle, corrupting the padded edge; `handleExport` scales `pxPerSec` by
-  the export/preview width ratio so exported scroll speed visually matches
-  the preview; downloaded filename suffixes `_landscape`/`_portrait`.
+  `OfflineAudioContext` render. Fixed: `loadInstrument` passes `scheduler:
+  Scheduler(ctx, { lookaheadMs: Infinity })` when `ctx instanceof
+  OfflineAudioContext`. Also fixed: `isNoteInWindow` (mapping.ts) now takes
+  the note's own radius so large dots scroll in instead of popping in;
+  `handleExport` scales `pxPerSec` by the export/preview width ratio;
+  filename suffixes `_landscape`/`_portrait`. **Tried and reverted:**
+  1920x1088/1088x1920 (mod-16, no H.264 crop needed) to fix a reported
+  iMessage/iCloud-sync corruption artifact — reverted because iPhones record
+  their own 1080p (also not ÷16) through that same pipeline fine daily, so
+  the theory was likely wrong, and the 0.7% aspect deviation risked real
+  letterboxing on strict-ratio uploads (Instagram). Don't retry mod-16
+  dimensions without real evidence it's the cause. Root cause still open;
+  codec level dropped 5.1→4.2 (standard for 1080p60, not 4K) as a
+  defensible-but-unconfirmed adjustment instead.
 - M5 done (2026-07-15): config sidebar (`ConfigPanel.tsx`, persisted via
   `config/storage.ts`) for track show/hide+color, bg, speed, canvas-relative
   dot scale, playhead, bar-lines/numbers/connecting-lines; lead-in/lead-out

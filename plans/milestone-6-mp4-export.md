@@ -151,15 +151,26 @@ browser-sandbox verification above didn't catch:
    sounding) and a full `fur_elise.mid` render (audio present throughout).
 2. **Corrupted blank blocks along one edge after iPhone/iMessage roundtrip**
    (AirDrop and a first-generation iMessage send were both fine — only after
-   iCloud's own re-compression touched the file). Best-supported hypothesis:
+   iCloud's own re-compression touched the file). Initial hypothesis:
    1920×1080/1080×1920 each have one side not divisible by 16, which H.264
-   pads internally and crops back via bitstream metadata (standard, universal
-   — true of virtually all 1080p video), but Apple's transcode pipeline
-   apparently doesn't respect that crop. Fixed defensively by switching
-   `EXPORT_RESOLUTIONS` to 1920×1088/1088×1920 (mod-16 on both sides, ~0.7%
-   aspect deviation, invisible) so no crop metadata is needed at all. Could
-   not reproduce Apple's transcode pipeline in this environment to confirm
-   directly — flagged to the user for re-test.
+   pads internally and crops back via bitstream metadata, and Apple's
+   transcode pipeline doesn't respect that crop — "fixed" by switching
+   `EXPORT_RESOLUTIONS` to 1920×1088/1088×1920 (mod-16 on both sides).
+   **Reverted after user pushback**, which was correct to raise: iPhones
+   record their own 1080p video (also not ÷16) constantly, and that footage
+   moves through the exact same AirDrop/iMessage/iCloud pipeline every day
+   without corruption — if non-mod-16 dimensions broke Apple's transcode,
+   basically all iPhone video would break, which it doesn't. So the theory
+   was very likely wrong, and the fix's ~0.7% aspect deviation from exact
+   16:9 risked a real, confirmed downside (letterboxing on platforms like
+   Instagram that enforce exact declared aspect ratios) in exchange for an
+   unconfirmed, unlikely fix — a bad trade. Reverted `EXPORT_RESOLUTIONS` to
+   exact 1920×1080/1080×1920. Made one more defensible (but still unconfirmed)
+   adjustment instead: dropped the H.264 level from 5.1 (4K-oriented, an
+   unusual choice for 1080p that untested transcoders are less likely to
+   handle well) to 4.2 (the standard level for 1080p60). Root cause of the
+   artifact remains unconfirmed — could not reproduce Apple's transcode
+   pipeline in this environment. Flagged to the user for re-test.
 3. **Large dots (long notes) popped into view abruptly at the right edge**
    instead of scrolling in. `isNoteInWindow` (mapping.ts) only checked a
    note's center against the window plus a fixed 40px pad — too small for a
@@ -176,7 +187,9 @@ browser-sandbox verification above didn't catch:
 5. **Filename collision** between landscape/portrait exports of the same
    file. Fixed by appending `_landscape`/`_portrait` to the downloaded name.
 
-All fixed in 4 follow-up commits (`e544ae1`, `a7331fe`, `13b1d18`, `3d750a9`).
-108 tests / lint / typecheck clean after each. #2 is the one fix that
-couldn't be directly verified in this environment (no iPhone/iMessage access)
-— everything else was confirmed either via a targeted repro or a full render.
+#1, #3, #4, #5 fixed and verified in 4 commits (`e544ae1`, `a7331fe`,
+`13b1d18`, `3d750a9`) — #1, #3, #4 via a targeted repro or full render, #5 by
+inspection. #2's mod-16 attempt shipped in `13b1d18` and was reverted in a
+follow-up commit after user pushback (see above); its replacement (codec
+level 5.1→4.2) is unverified, and the artifact's root cause is still open.
+108 tests / lint / typecheck clean throughout.
