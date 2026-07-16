@@ -23,15 +23,16 @@ Vite · React 18 · TypeScript strict · Canvas 2D · @tonejs/midi · WebCodecs 
 - Conventional commits; commit per milestone task.
 
 ## Current state
-- Milestone 7 (website/app UI design revamp) DONE (2026-07-15). Next: M8
-  (housekeeping & quick UI wins) — see SPEC.md §6 for M8-M14, BACKLOG.md for
-  unscheduled ("Later") work. Per-milestone implementation detail lives in
-  `plans/milestone-N-*.md` and git history, not here.
+- Milestone 7 (website/app UI design revamp) DONE (2026-07-15), plus a
+  same-day UI-polish pass (dropdown width, favicon, MIDI/audio actions,
+  slider theming, Bodoni Moda legends). Next: M8 — see SPEC.md §6 for
+  M8-M14, BACKLOG.md (grouped by milestone) for detail, not here.
 - Traps (not obvious from reading the code):
   - `<fieldset>`'s implicit `min-width: min-content` ignores flex/grid
-    ancestors; CSS Grid items have the same default independently. Both need
-    explicit `min-width: 0` or one long unbreakable string (e.g. a track
-    name) blows the layout into horizontal scroll.
+    ancestors; CSS Grid items and `<select>` (sizes to its widest `<option>`)
+    have the same default independently — all three need `min-width: 0` (or
+    a stacked-label layout for long `<select>` options) or one long string
+    blows the layout into horizontal scroll.
   - Don't retry mod-16 export dimensions (1920×1088 etc.) without real
     evidence — tried once for a reported MP4 corruption bug, reverted; root
     cause still open (see M6 plan).
@@ -47,7 +48,7 @@ Vite · React 18 · TypeScript strict · Canvas 2D · @tonejs/midi · WebCodecs 
 - Known simplifications: no devicePixelRatio scaling; per-track colors/
   visibility and external-audio offset are session-only; playback end is
   MIDI-driven (external audio longer than the MIDI gets cut off); one shared
-  instrument for all tracks (per-track GM is BACKLOG #5, Next); export
+  instrument for all tracks (per-track GM is BACKLOG #15, M12); export
   bar-line/number text and line widths don't scale with resolution.
 <!-- Update this section at the end of every session; it replaces chat history. -->
 
