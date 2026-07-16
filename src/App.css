@@ -80,11 +80,11 @@
 
 .config-panel legend {
   padding: 0 0.35rem;
-  font-family: var(--font-display);
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-family: var(--font-eyebrow);
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: lowercase;
   color: var(--text-muted);
 }
 
@@ -118,6 +118,24 @@
   width: 4.5rem;
 }
 
+.config-row select {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Instrument / aspect-ratio options can run long (soundfont names, "Portrait
+   9:16 (Reels/Stories)"); stacking the label above the select instead of
+   sharing the row gives it the full sidebar width so it doesn't clip. */
+.config-row.config-row-stacked {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.35rem;
+}
+
+.config-row.config-row-stacked select {
+  width: 100%;
+}
+
 .export-error {
   color: var(--danger);
   font-size: 0.8rem;
@@ -139,6 +157,20 @@
   flex-direction: column;
   gap: 0.9rem;
   min-width: 0;
+}
+
+.file-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.file-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .file-status {
@@ -290,6 +322,11 @@
   color: var(--text);
 }
 
+.btn-sm {
+  padding: 0.35rem 0.7rem;
+  font-size: 0.78rem;
+}
+
 .file-label {
   cursor: pointer;
 }
@@ -318,8 +355,56 @@ input[type='number'] {
 }
 
 input[type='range'] {
+  -webkit-appearance: none;
+  appearance: none;
   height: 1.1rem;
-  accent-color: var(--accent);
+  background: transparent;
+  cursor: pointer;
+}
+
+input[type='range']::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+
+input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: -6px;
+  border-radius: 50%;
+  background: var(--accent-bright);
+  border: 2px solid var(--bg);
+  box-shadow: 0 0 0 1px var(--border);
+}
+
+input[type='range']::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+
+input[type='range']::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent-bright);
+  border: 2px solid var(--bg);
+  box-shadow: 0 0 0 1px var(--border);
+}
+
+input[type='range']:hover:not(:disabled)::-webkit-slider-thumb,
+input[type='range']:hover:not(:disabled)::-moz-range-thumb {
+  background: var(--accent);
+}
+
+input[type='range']:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
 }
 
 :focus-visible {

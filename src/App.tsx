@@ -489,31 +489,6 @@ function App() {
         <h1 className="brand">
           <img src="/images/melograffer_title_dark.png" alt="Melograffer" className="brand-mark" />
         </h1>
-        <div className="app-bar-actions">
-          <button type="button" className="btn" onClick={() => midiFileInputRef.current?.click()}>
-            {midiFileName ? 'Change MIDI' : 'Choose MIDI'}
-          </button>
-          <input
-            ref={midiFileInputRef}
-            type="file"
-            accept=".mid,.midi"
-            aria-label="MIDI file"
-            onChange={handleFileChange}
-            className="visually-hidden"
-          />
-          {!externalAudioName && (
-            <label className="btn btn-ghost file-label">
-              Audio file
-              <input
-                type="file"
-                accept="audio/*,.mp3,.wav"
-                aria-label="Audio file"
-                onChange={handleAudioFileChange}
-                className="visually-hidden"
-              />
-            </label>
-          )}
-        </div>
       </header>
 
       <div className="workspace">
@@ -531,15 +506,48 @@ function App() {
           exportError={exportError}
         />
         <section className="stage">
-          <p className="file-status">
-            {midiFileName ? (
-              <>
-                MIDI: <strong>{midiFileName}</strong>
-              </>
-            ) : (
-              'Drop a MIDI file to see its tracks.'
+          <div className="file-bar">
+            <p className="file-status">
+              {midiFileName ? (
+                <>
+                  MIDI: <strong>{midiFileName}</strong>
+                </>
+              ) : (
+                'Drop a MIDI file to see its tracks.'
+              )}
+            </p>
+            {score && (
+              <div className="file-bar-actions">
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => midiFileInputRef.current?.click()}
+                >
+                  Change MIDI
+                </button>
+                {!externalAudioName && (
+                  <label className="btn btn-ghost btn-sm file-label">
+                    Add audio
+                    <input
+                      type="file"
+                      accept="audio/*,.mp3,.wav"
+                      aria-label="Audio file"
+                      onChange={handleAudioFileChange}
+                      className="visually-hidden"
+                    />
+                  </label>
+                )}
+              </div>
             )}
-          </p>
+            <input
+              ref={midiFileInputRef}
+              type="file"
+              accept=".mid,.midi"
+              aria-label="MIDI file"
+              onChange={handleFileChange}
+              className="visually-hidden"
+            />
+          </div>
 
           <div
             className="canvas-frame"

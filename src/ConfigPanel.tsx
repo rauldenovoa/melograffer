@@ -159,7 +159,7 @@ export function ConfigPanel({
       {instrumentNames.length > 0 && (
         <fieldset>
           <legend>Sound</legend>
-          <label className="config-row">
+          <label className="config-row config-row-stacked">
             <span>Instrument</span>
             <select
               aria-label="Instrument"
@@ -210,7 +210,7 @@ export function ConfigPanel({
 
       <fieldset>
         <legend>Export</legend>
-        <label className="config-row">
+        <label className="config-row config-row-stacked">
           <span>Aspect ratio</span>
           <select
             aria-label="Export aspect ratio"

@@ -14,6 +14,14 @@
   src: url('/fonts/Fraunces-Variable.woff2') format('woff2');
 }
 
+@font-face {
+  font-family: 'Bodoni Moda';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/BodoniModa-Bold.woff2') format('woff2');
+}
+
 :root {
   color-scheme: dark;
 
@@ -38,6 +46,7 @@
 
   --font-ui: 'Inter', system-ui, -apple-system, sans-serif;
   --font-display: 'Fraunces', 'Iowan Old Style', Georgia, serif;
+  --font-eyebrow: 'Bodoni Moda', 'Fraunces', Didot, 'Bodoni MT', Georgia, serif;
 
   accent-color: var(--accent);
 }
